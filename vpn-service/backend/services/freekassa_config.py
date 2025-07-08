@@ -17,6 +17,7 @@ class FreeKassaConfig:
     Используется для валидации и работы с настройками FreeKassa
     """
     # Основные учетные данные
+    merchant_id: str  # Числовой ID магазина в FreeKassa
     api_key: str
     secret1: str  # Секретное слово №1 (для формирования подписи)
     secret2: str  # Секретное слово №2 (для проверки уведомлений)
@@ -45,6 +46,9 @@ class FreeKassaConfig:
     
     def validate(self) -> None:
         """Валидация конфигурации"""
+        if not self.merchant_id:
+            raise ValueError("Merchant ID обязателен")
+            
         if not self.api_key:
             raise ValueError("API ключ обязателен")
         

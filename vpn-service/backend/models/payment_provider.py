@@ -149,6 +149,7 @@ class PaymentProvider(Base):
             return {}
         
         return {
+            "merchant_id": self.get_config_value("merchant_id"),  # Добавляем merchant_id
             "api_key": self.get_config_value("api_key"),
             "secret1": self.get_config_value("secret1"),
             "secret2": self.get_config_value("secret2"),
@@ -183,7 +184,7 @@ class PaymentProvider(Base):
                     return False, f"Поле {field} обязательно для Робокассы"
         
         elif self.provider_type == PaymentProviderType.freekassa:
-            required_fields = ["api_key", "secret1", "secret2"]
+            required_fields = ["merchant_id", "api_key", "secret1", "secret2"]
             for field in required_fields:
                 if not self.get_config_value(field):
                     return False, f"Поле {field} обязательно для FreeKassa"

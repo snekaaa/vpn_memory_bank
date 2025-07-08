@@ -20,6 +20,7 @@ from routes.integration import router as integration_router
 from routes.payments import router as api_payments_router
 from routes.users import router as api_users_router
 from routes.plans import router as plans_router
+from routes.webhooks import router as webhooks_router
 from services.health_checker import HealthChecker
 from app.admin.routes import router as admin_router
 
@@ -46,6 +47,7 @@ app.include_router(test_router)
 app.include_router(integration_router, prefix="/api/v1")
 app.include_router(api_payments_router, prefix="/api/v1")
 app.include_router(api_users_router, prefix="/api/v1")
+app.include_router(webhooks_router, prefix="/api/v1")
 app.include_router(plans_router)
 
 # Период проверки здоровья нод (в секундах)
