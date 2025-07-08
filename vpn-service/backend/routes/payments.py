@@ -244,7 +244,7 @@ async def create_payment(
             payment.robokassa_invoice_id = str(payment.id)
             
         elif provider.provider_type == PaymentProviderType.freekassa:
-            # FreeKassa сервис
+            # FreeKassa сервис - используем новый API
             from services.freekassa_service import FreeKassaService
             
             provider_config = provider.get_freekassa_config()
@@ -259,16 +259,23 @@ async def create_payment(
                 masked_config['secret2'] = '********'
             logger.info(f"FreeKassa provider config being used: {masked_config}")
 
-            freekassa_service = FreeKassaService(provider_config=provider_config)
-            payment_result = freekassa_service.create_payment_url(
-                order_id=str(payment.id),
-                amount=payment.amount,
-                description=payment.description,
-                email=request.user_email,
-                success_url=request.success_url,
-                failure_url=request.fail_url
+            # Создаем новый сервис с правильными параметрами
+            freekassa_service = FreeKassaService(
+                merchant_id=provider_config['merchant_id'],
+                api_key=provider_config['api_key'],
+                secret_word_1=provider_config['secret1'],
+                secret_word_2=provider_config['secret2']
             )
-            payment_url = payment_result['url']
+            
+            # Используем новый API-метод
+            payment_url = await freekassa_service.create_payment_url(
+                amount=payment.amount,
+                order_id=str(payment.id),
+                currency=payment.currency,
+                email=request.user_email or f"user_{request.user_id}@telegram.local",
+                user_ip="127.0.0.1",  # Можно извлечь из запроса если нужно
+                payment_system_id=4  # VISA/MasterCard по умолчанию
+            )
             
             payment.external_id = str(payment.id)
             
@@ -295,7 +302,18 @@ async def create_payment(
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating payment: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Ошибка создания платежа")
+        
+        # Проверяем специфичные ошибки для более понятных сообщений
+        error_msg = str(e)
+        if "временно недоступна" in error_msg or "not activated" in error_msg:
+            # Если основной провайдер недоступен, показываем сообщение с рекомендацией
+            detail = f"{error_msg} Попробуйте позже или воспользуйтесь другим способом оплаты."
+        elif "Неверные параметры" in error_msg:
+            detail = f"{error_msg} Проверьте корректность данных или обратитесь в поддержку."
+        else:
+            detail = f"Ошибка создания платежа: {error_msg}"
+        
+        raise HTTPException(status_code=500, detail=detail)
 
 @router.get("/{payment_id}", response_model=PaymentStatusResponse)
 async def get_payment_status(
