@@ -46,11 +46,15 @@ class PaymentManagementService:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Payment:
         """
-        Создание ручного платежа с audit logging
+        Создание ручного платежа администратором
+        
+        Этот метод позволяет админу создавать платеж для пользователя без внешних платежных систем.
+        Платеж создается в статусе PENDING и требует дальнейшего подтверждения через
+        update_payment_status() для активации подписки.
         
         Args:
-            user_id: ID пользователя
-            amount: Сумма платежа (может быть 0.0 для триальных)
+            user_id: ID пользователя в Telegram
+            amount: Сумма платежа
             description: Описание платежа
             payment_method: Метод платежа (manual_admin, manual_trial, etc.)
             admin_user: Пользователь, создающий платеж (для audit)
@@ -64,72 +68,70 @@ class PaymentManagementService:
             ValueError: При некорректных входных данных
             Exception: При ошибках создания
         """
-        async with self.db.begin():
-            try:
-                # Валидация входных данных
-                await self._validate_payment_creation_data(user_id, amount, payment_method)
-                
-                # Проверяем существование пользователя
-                user = await self._get_user_or_raise(user_id)
-                
-                # Подготавливаем метаданные с количеством дней
-                payment_metadata = metadata or {}
-                if subscription_days:
-                    payment_metadata["subscription_days"] = subscription_days
-                
-                # Создаем платеж
-                payment = Payment(
-                    user_id=user_id,
-                    amount=amount,
-                    currency="RUB",
-                    status=PaymentStatus.PENDING,  # Создаем в статусе PENDING
-                    payment_method=payment_method,
-                    description=description,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
-                    payment_metadata=payment_metadata
-                )
-                
-                self.db.add(payment)
-                await self.db.flush()  # Получаем ID платежа
-                
-                # Audit logging
-                await self._log_payment_operation(
-                    operation="CREATE_MANUAL_PAYMENT",
-                    payment_id=payment.id,
-                    admin_user=admin_user,
-                    details={
-                        "user_id": user_id,
-                        "amount": amount,
-                        "payment_method": payment_method.value,
-                        "description": description,
-                        "subscription_days": subscription_days,
-                        "metadata": metadata
-                    }
-                )
-                
-                self.logger.info(
-                    "Manual payment created",
-                    payment_id=payment.id,
-                    user_id=user_id,
-                    amount=amount,
-                    payment_method=payment_method.value,
-                    admin_user=admin_user
-                )
-                
-                return payment
-                
-            except Exception as e:
-                await self.db.rollback()
-                self.logger.error(
-                    "Failed to create manual payment",
-                    user_id=user_id,
-                    amount=amount,
-                    admin_user=admin_user,
-                    error=str(e),
-                    exc_info=True
-                )
-                raise
+        try:
+            # Валидация входных данных
+            await self._validate_payment_creation_data(user_id, amount, payment_method)
+            
+            # Проверяем существование пользователя
+            user = await self._get_user_or_raise(user_id)
+            
+            # Подготавливаем метаданные с количеством дней
+            payment_metadata = metadata or {}
+            if subscription_days:
+                payment_metadata["subscription_days"] = subscription_days
+            
+            # Создаем платеж
+            payment = Payment(
+                user_id=user_id,
+                amount=amount,
+                currency="RUB",
+                status=PaymentStatus.PENDING,  # Создаем в статусе PENDING
+                payment_method=payment_method,
+                description=description,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+                payment_metadata=payment_metadata
+            )
+            
+            self.db.add(payment)
+            await self.db.flush()  # Получаем ID платежа
+            
+            # Audit logging
+            await self._log_payment_operation(
+                operation="CREATE_MANUAL_PAYMENT",
+                payment_id=payment.id,
+                admin_user=admin_user,
+                details={
+                    "user_id": user_id,
+                    "amount": amount,
+                    "payment_method": payment_method.value,
+                    "description": description,
+                    "subscription_days": subscription_days,
+                    "metadata": metadata
+                }
+            )
+            
+            self.logger.info(
+                "Manual payment created",
+                payment_id=payment.id,
+                user_id=user_id,
+                amount=amount,
+                payment_method=payment_method.value,
+                admin_user=admin_user
+            )
+            
+            return payment
+            
+        except Exception as e:
+            self.logger.error(
+                "Failed to create manual payment",
+                user_id=user_id,
+                amount=amount,
+                admin_user=admin_user,
+                error=str(e),
+                exc_info=True
+            )
+            raise
     
     async def update_payment_status(
         self,
