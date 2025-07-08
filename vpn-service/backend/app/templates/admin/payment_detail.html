@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Платеж #{{ payment.id }}</h2>
+        <p class="text-muted mb-0">Детальная информация о платеже</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/payments" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Назад к списку
+        </a>
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Payment Status Card -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card admin-card">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    {% if payment.status.value == 'SUCCEEDED' %}
+                        <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                        <h5 class="text-success mt-2">Платеж завершён</h5>
+                    {% elif payment.status.value == 'PENDING' %}
+                        <i class="bi bi-clock text-warning" style="font-size: 3rem;"></i>
+                        <h5 class="text-warning mt-2">В ожидании</h5>
+                    {% elif payment.status.value == 'PROCESSING' %}
+                        <i class="bi bi-hourglass text-info" style="font-size: 3rem;"></i>
+                        <h5 class="text-info mt-2">Обработка</h5>
+                    {% elif payment.status.value == 'FAILED' %}
+                        <i class="bi bi-x-circle text-danger" style="font-size: 3rem;"></i>
+                        <h5 class="text-danger mt-2">Неудача</h5>
+                    {% elif payment.status.value == 'CANCELLED' %}
+                        <i class="bi bi-dash-circle text-secondary" style="font-size: 3rem;"></i>
+                        <h5 class="text-secondary mt-2">Отменён</h5>
+                    {% else %}
+                        <i class="bi bi-question-circle text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-2">{{ payment.status.value }}</h5>
+                    {% endif %}
+                </div>
+                <h3 class="mb-0">{{ "{:,.2f}".format(payment.amount) }} {{ payment.currency }}</h3>
+                {% if payment.confirmation_url %}
+                    <a href="{{ payment.confirmation_url }}" target="_blank" class="btn btn-primary btn-sm mt-2">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Ссылка для оплаты
+                    </a>
+                {% endif %}
+                
+                <!-- Manual Status Change Buttons -->
+                {% if payment.payment_method.value in ['manual_admin', 'manual_trial', 'manual_correction', 'auto_trial'] %}
+                    <div class="mt-3">
+                        {% if payment.status.value == 'PENDING' %}
+                            <button type="button" class="btn btn-success btn-sm me-1" onclick="changePaymentStatus('SUCCEEDED')">
+                                <i class="bi bi-check-circle me-1"></i>Подтвердить
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="changePaymentStatus('FAILED')">
+                                <i class="bi bi-x-circle me-1"></i>Отклонить
+                            </button>
+                        {% elif payment.status.value == 'FAILED' %}
+                            <button type="button" class="btn btn-success btn-sm" onclick="changePaymentStatus('SUCCEEDED')">
+                                <i class="bi bi-check-circle me-1"></i>Подтвердить
+                            </button>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Основная информация</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">ID платежа</label>
+                            <div class="fw-bold">#{{ payment.id }}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Пользователь</label>
+                            <div class="fw-bold">
+                                ID {{ payment.user_id }}
+                                {% if payment.user %}
+                                    <small class="text-muted d-block">{{ payment.user.telegram_id }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Метод оплаты</label>
+                            <div>
+                                <span class="badge bg-info">{{ payment.payment_method.value }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Внешний ID</label>
+                            <div class="fw-bold">
+                                {% if payment.external_id %}
+                                    <code>{{ payment.external_id }}</code>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Услуга</label>
+                            <div class="fw-bold">
+                                {% if payment.subscription %}
+                                    {{ payment.subscription.plan_name }}
+                                    <small class="text-muted d-block">{{ "{:,.2f}".format(payment.subscription.price) }} {{ payment.subscription.currency }}</small>
+                                {% else %}
+                                    <span class="text-muted">Не указана</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Описание</label>
+                            <div>
+                                {% if payment.description %}
+                                    {{ payment.description }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technical Details -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Техническая информация</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Robokassa Invoice ID</label>
+                    <div class="fw-bold">
+                        {% if payment.robokassa_invoice_id %}
+                            <code>{{ payment.robokassa_invoice_id }}</code>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Robokassa Payment Method</label>
+                    <div>
+                        {% if payment.robokassa_payment_method %}
+                            {{ payment.robokassa_payment_method }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Robokassa Signature</label>
+                    <div>
+                        {% if payment.robokassa_signature %}
+                            <code class="text-break">{{ payment.robokassa_signature[:50] }}{% if payment.robokassa_signature|length > 50 %}...{% endif %}</code>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Причина неудачи</label>
+                    <div>
+                        {% if payment.failure_reason %}
+                            <span class="text-danger">{{ payment.failure_reason }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Временные метки</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Создан</label>
+                    <div class="fw-bold">
+                        {% if payment.created_at %}
+                            {{ payment.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Обновлён</label>
+                    <div class="fw-bold">
+                        {% if payment.updated_at %}
+                            {{ payment.updated_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Оплачен</label>
+                    <div class="fw-bold">
+                        {% if payment.paid_at %}
+                            {{ payment.paid_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Обработан</label>
+                    <div class="fw-bold">
+                        {% if payment.processed_at %}
+                            {{ payment.processed_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Raw Data -->
+<div class="row">
+    <div class="col-12">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Техническая информация</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Payment System Data</label>
+                            <div>
+                                {% if payment.payment_system_data %}
+                                    <pre class="border rounded p-2 bg-light"><code>{{ payment.payment_system_data }}</code></pre>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">External Data</label>
+                            <div>
+                                {% if payment.external_data %}
+                                    <pre class="border rounded p-2 bg-light"><code>{{ payment.external_data | tojson(indent=2) }}</code></pre>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Payment Metadata</label>
+                            <div>
+                                {% if payment.payment_metadata %}
+                                    <pre class="border rounded p-2 bg-light"><code>{{ payment.payment_metadata | tojson(indent=2) }}</code></pre>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Confirmation URL</label>
+                            <div>
+                                {% if payment.confirmation_url %}
+                                    <a href="{{ payment.confirmation_url }}" target="_blank" class="text-break">
+                                        {{ payment.confirmation_url }}
+                                        <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Change Modal -->
+<div class="modal fade" id="statusChangeModal" tabindex="-1" aria-labelledby="statusChangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusChangeModalLabel">Изменить статус платежа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите изменить статус платежа <strong>#{{ payment.id }}</strong> на <strong id="newStatusText"></strong>?</p>
+                <div class="mb-3">
+                    <label for="changeReason" class="form-label">Причина изменения (опционально)</label>
+                    <textarea class="form-control" id="changeReason" rows="2" placeholder="Укажите причину изменения статуса"></textarea>
+                </div>
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    При смене статуса на "SUCCEEDED" подписка пользователя будет автоматически продлена в соответствии с суммой платежа.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">Изменить статус</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentNewStatus = null;
+
+function changePaymentStatus(newStatus) {
+    currentNewStatus = newStatus;
+    
+    document.getElementById('newStatusText').textContent = newStatus;
+    document.getElementById('changeReason').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('statusChangeModal'));
+    modal.show();
+}
+
+document.getElementById('confirmStatusChange').addEventListener('click', async function() {
+    if (!currentNewStatus) return;
+    
+    const reason = document.getElementById('changeReason').value.trim();
+    
+    try {
+        const response = await fetch(`/admin/api/payments/{{ payment.id }}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                new_status: currentNewStatus,
+                reason: reason || null
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Закрываем модал
+            const modal = bootstrap.Modal.getInstance(document.getElementById('statusChangeModal'));
+            modal.hide();
+            
+            // Перезагружаем страницу для обновления данных
+            location.reload();
+        } else {
+            console.error('Ошибка изменения статуса:', result.detail || result.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при изменении статуса:', error);
+    }
+});
+
+// Подтверждение действий по Ctrl+Enter в модале
+document.getElementById('changeReason').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && e.ctrlKey) {
+        document.getElementById('confirmStatusChange').click();
+    }
+});
+</script>
+
+{% endblock %} 

@@ -1,0 +1,42 @@
+{
+  "monthly": {
+    "id": "monthly",
+    "name": "Месячная подписка",
+    "price": 10.0,
+    "duration": "30 дней",
+    "duration_days": 30,
+    "description": "VPN подписка на 1 месяц",
+    "active": true,
+    "discount": null
+  },
+  "quarterly": {
+    "id": "quarterly",
+    "name": "Квартальная подписка",
+    "price": 889.0,
+    "duration": "90 дней",
+    "duration_days": 90,
+    "description": "VPN подписка на 3 месяца",
+    "discount": "17%",
+    "active": true
+  },
+  "semi_annual": {
+    "id": "semi_annual",
+    "name": "Полугодовая подписка",
+    "price": 1290.0,
+    "duration": "180 дней",
+    "duration_days": 180,
+    "description": "VPN подписка на 6 месяцев",
+    "discount": "25%",
+    "active": true
+  },
+  "annual": {
+    "id": "annual",
+    "name": "Годовая подписка",
+    "price": 3000.0,
+    "duration": "365 дней",
+    "duration_days": 365,
+    "description": "VPN подписка на 1 год",
+    "discount": "33%",
+    "active": true
+  }
+} 

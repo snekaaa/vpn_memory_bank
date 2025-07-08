@@ -1,0 +1,364 @@
+{% extends "../../../app/templates/base.html" %}
+
+{% block title %}Мониторинг VPN нод | VPN Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-graph-up"></i> Мониторинг VPN нод</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/admin/nodes" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-list"></i> Список нод
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="refreshData">
+                <i class="bi bi-arrow-clockwise"></i> Обновить данные
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- System Health Summary -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white {% if health_report.healthy_nodes == health_report.total_nodes %}bg-success{% elif health_report.healthy_nodes > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+            <div class="card-body">
+                <h5 class="card-title">Здоровье системы</h5>
+                <p class="card-text display-6">{{ health_report.healthy_nodes }}/{{ health_report.total_nodes }}</p>
+                <p class="card-text">Здоровых нод</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title">Активные ноды</h5>
+                <p class="card-text display-6">{{ health_report.active_nodes }}</p>
+                <p class="card-text">Из {{ health_report.total_nodes }} нод</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Пользователи</h5>
+                <p class="card-text display-6">{{ health_report.total_users }}</p>
+                <p class="card-text">Из {{ health_report.total_capacity }} мест</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card {% if health_report.load_percentage < 70 %}bg-success{% elif health_report.load_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %} text-white">
+            <div class="card-body">
+                <h5 class="card-title">Общая загрузка</h5>
+                <p class="card-text display-6">{{ health_report.load_percentage|round(1) }}%</p>
+                <p class="card-text">{{ health_report.total_users }} / {{ health_report.total_capacity }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Распределение пользователей</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="userDistributionChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Загрузка нод</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="nodeLoadChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Статус здоровья</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="healthStatusChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Время отклика (мс)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="responseTimeChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Node Status Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Статус нод</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Нода</th>
+                        <th>Локация</th>
+                        <th>Статус</th>
+                        <th>Здоровье</th>
+                        <th>Пользователи</th>
+                        <th>Загрузка</th>
+                        <th>Время отклика</th>
+                        <th>Последняя проверка</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for node in nodes %}
+                    <tr>
+                        <td>
+                            <a href="/admin/nodes/{{ node.id }}">{{ node.name }}</a>
+                        </td>
+                        <td>{{ node.location }}</td>
+                        <td>
+                            <span class="badge {% if node.status == 'active' %}bg-success{% elif node.status == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">
+                                {{ node.status }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {% if node.health_status == 'healthy' %}bg-success{% elif node.health_status == 'unknown' %}bg-secondary{% else %}bg-danger{% endif %}">
+                                {{ node.health_status }}
+                            </span>
+                        </td>
+                        <td>{{ node.current_users }} / {{ node.max_users }}</td>
+                        <td>
+                            <div class="progress">
+                                <div class="progress-bar {% if node.load_percentage < 70 %}bg-success{% elif node.load_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ node.load_percentage }}%" 
+                                     aria-valuenow="{{ node.load_percentage }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {{ node.load_percentage|round(1) }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ node.response_time_ms or 'Н/Д' }} мс</td>
+                        <td>
+                            {% if node.last_health_check %}
+                                {{ node.last_health_check.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                Никогда
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary check-health-btn" data-node-id="{{ node.id }}">
+                                <i class="bi bi-heart-pulse"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // User Distribution Chart
+    const userDistCtx = document.getElementById('userDistributionChart').getContext('2d');
+    const userDistChart = new Chart(userDistCtx, {
+        type: 'pie',
+        data: {
+            labels: [{% for stat in load_stats %}'{{ stat.name }}',{% endfor %}],
+            datasets: [{
+                data: [{% for stat in load_stats %}{{ stat.current_users }},{% endfor %}],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(153, 102, 255, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(199, 199, 199, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(199, 199, 199, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+    
+    // Node Load Chart
+    const nodeLoadCtx = document.getElementById('nodeLoadChart').getContext('2d');
+    const nodeLoadChart = new Chart(nodeLoadCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for stat in load_stats %}'{{ stat.name }}',{% endfor %}],
+            datasets: [{
+                label: 'Загрузка (%)',
+                data: [{% for stat in load_stats %}{{ stat.load_percentage|round(1) }},{% endfor %}],
+                backgroundColor: [{% for stat in load_stats %}{% if stat.load_percentage < 70 %}'rgba(75, 192, 192, 0.6)'{% elif stat.load_percentage < 90 %}'rgba(255, 206, 86, 0.6)'{% else %}'rgba(255, 99, 132, 0.6)'{% endif %},{% endfor %}],
+                borderColor: [{% for stat in load_stats %}{% if stat.load_percentage < 70 %}'rgba(75, 192, 192, 1)'{% elif stat.load_percentage < 90 %}'rgba(255, 206, 86, 1)'{% else %}'rgba(255, 99, 132, 1)'{% endif %},{% endfor %}],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    // Health Status Chart
+    const healthCtx = document.getElementById('healthStatusChart').getContext('2d');
+    const healthChart = new Chart(healthCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Здоровые', 'Нездоровые', 'Неизвестно'],
+            datasets: [{
+                data: [
+                    {{ health_report.healthy_nodes }}, 
+                    {{ health_report.unhealthy_nodes }},
+                    {{ health_report.total_nodes - health_report.healthy_nodes - health_report.unhealthy_nodes }}
+                ],
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(200, 200, 200, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(200, 200, 200, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+    
+    // Response Time Chart
+    const responseTimeCtx = document.getElementById('responseTimeChart').getContext('2d');
+    const responseTimeChart = new Chart(responseTimeCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for node in nodes %}{% if node.response_time_ms %}'{{ node.name }}',{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Время отклика (мс)',
+                data: [{% for node in nodes %}{% if node.response_time_ms %}{{ node.response_time_ms }},{% endif %}{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    
+    // Check health button
+    document.querySelectorAll('.check-health-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const nodeId = this.getAttribute('data-node-id');
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            this.disabled = true;
+            
+            fetch(`/admin/nodes/${nodeId}/check-health`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.innerHTML = '<i class="bi bi-check-circle"></i>';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="bi bi-heart-pulse"></i>';
+                        this.disabled = false;
+                    }, 2000);
+                    
+                    // Reload page after 2 seconds to show updated data
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    this.innerHTML = '<i class="bi bi-x-circle"></i>';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="bi bi-heart-pulse"></i>';
+                        this.disabled = false;
+                    }, 2000);
+                }
+            })
+            .catch(error => {
+                this.innerHTML = '<i class="bi bi-x-circle"></i>';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="bi bi-heart-pulse"></i>';
+                    this.disabled = false;
+                }, 2000);
+            });
+        });
+    });
+    
+    // Refresh data button
+    document.getElementById('refreshData').addEventListener('click', function() {
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Обновление...';
+        this.disabled = true;
+        location.reload();
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,292 @@
+{% extends "../../base.html" %}
+
+{% block title %}Редактировать {{ node.name }} | VPN Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-pencil"></i> Редактировать ноду</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/admin/nodes/{{ node.id }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Назад к ноде
+            </a>
+            <a href="/admin/nodes" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-list"></i> Список нод
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="card admin-card">
+    <div class="card-header">
+        <h5><i class="bi bi-pencil me-2"></i>Редактирование ноды "{{ node.name }}"</h5>
+    </div>
+    <div class="card-body">
+        <form action="/admin/nodes/{{ node.id }}/edit" method="post" id="editNodeForm">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="mb-3"><i class="bi bi-info-circle me-2"></i>Основная информация</h5>
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Название ноды *</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ node.name }}" required>
+                        <div class="form-text">Уникальное название ноды</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Описание</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ node.description or '' }}</textarea>
+                        <div class="form-text">Краткое описание ноды</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Локация</label>
+                        <input type="text" class="form-control" id="location" name="location" value="{{ node.location or '' }}">
+                        <div class="form-text">Географическое расположение сервера</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Статус</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="active" {% if node.status == 'active' %}selected{% endif %}>
+                                <i class="bi bi-check-circle"></i> Активна
+                            </option>
+                            <option value="inactive" {% if node.status == 'inactive' %}selected{% endif %}>
+                                <i class="bi bi-x-circle"></i> Неактивна
+                            </option>
+                            <option value="maintenance" {% if node.status == 'maintenance' %}selected{% endif %}>
+                                <i class="bi bi-tools"></i> Обслуживание
+                            </option>
+                        </select>
+                        <div class="form-text">Текущий статус ноды</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <h5 class="mb-3"><i class="bi bi-gear me-2"></i>Настройки X3UI</h5>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_url" class="form-label">URL X3UI панели *</label>
+                        <input type="url" class="form-control" id="x3ui_url" name="x3ui_url" value="{{ node.x3ui_url }}" required>
+                        <div class="form-text">Полный URL с протоколом и портом (например: https://your-server.com:2053)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_username" class="form-label">Имя пользователя *</label>
+                        <input type="text" class="form-control" id="x3ui_username" name="x3ui_username" value="{{ node.x3ui_username }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_password" class="form-label">Пароль *</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="x3ui_password" name="x3ui_password" value="{{ node.x3ui_password }}" required>
+                            <button class="btn btn-outline-secondary" type="button" id="showPassword">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Тест соединения</label>
+                        <div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="testConnection">
+                                <i class="bi bi-wifi"></i> Проверить соединение
+                            </button>
+                            <span id="connectionStatus" class="ms-2"></span>
+                        </div>
+                        <div class="form-text">Проверьте соединение перед сохранением</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h5 class="mb-3"><i class="bi bi-diagram-3 me-2"></i>Настройки балансировки нагрузки</h5>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="max_users" class="form-label">Максимум пользователей</label>
+                        <input type="number" class="form-control" id="max_users" name="max_users" value="{{ node.max_users }}" min="1" max="10000">
+                        <div class="form-text">Максимальное количество пользователей на ноде</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Приоритет</label>
+                        <input type="number" class="form-control" id="priority" name="priority" value="{{ node.priority }}" min="1" max="1000">
+                        <div class="form-text">Чем выше значение, тем выше приоритет при распределении</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="weight" class="form-label">Вес</label>
+                        <input type="number" class="form-control" id="weight" name="weight" value="{{ node.weight }}" min="0.1" max="10" step="0.1">
+                        <div class="form-text">Множитель нагрузки (1.0 = стандартный, 0.5 = половина)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Current Status Info -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-info-circle me-2"></i>Текущее состояние ноды</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Текущие пользователи:</strong><br>
+                                    <span class="badge bg-primary">{{ node.current_users or 0 }}</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Загрузка:</strong><br>
+                                    <div class="progress mt-1">
+                                        <div class="progress-bar {% if node.load_percentage < 70 %}bg-success{% elif node.load_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             style="width: {{ node.load_percentage }}%">
+                                            {{ node.load_percentage|round(1) }}%
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Здоровье:</strong><br>
+                                    <span class="badge {% if node.health_status == 'healthy' %}bg-success{% elif node.health_status == 'unknown' %}bg-secondary{% else %}bg-danger{% endif %}">
+                                        {{ node.health_status }}
+                                    </span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Последняя проверка:</strong><br>
+                                    {% if node.last_health_check %}
+                                        {{ node.last_health_check.strftime('%d.%m.%Y %H:%M') }}
+                                    {% else %}
+                                        Никогда
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="/admin/nodes/{{ node.id }}" class="btn btn-secondary me-md-2">
+                    <i class="bi bi-x-lg me-1"></i>Отмена
+                </a>
+                <button type="submit" class="btn btn-primary" id="saveBtn">
+                    <i class="bi bi-check-lg me-1"></i>Сохранить изменения
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show/hide password
+    document.getElementById('showPassword').addEventListener('click', function() {
+        const passwordField = document.getElementById('x3ui_password');
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+        this.innerHTML = type === 'password' ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+    });
+    
+    // Test connection
+    document.getElementById('testConnection').addEventListener('click', function() {
+        const statusElement = document.getElementById('connectionStatus');
+        const button = this;
+        const url = document.getElementById('x3ui_url').value;
+        const username = document.getElementById('x3ui_username').value;
+        const password = document.getElementById('x3ui_password').value;
+        
+        if (!url || !username || !password) {
+            adminUtils.showToast('Заполните все поля X3UI для проверки соединения', 'warning');
+            return;
+        }
+        
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Проверка...';
+        statusElement.innerHTML = '';
+        
+        // Test connection with current form values
+        fetch('/admin/nodes/{{ node.id }}/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                x3ui_url: url,
+                x3ui_username: username,
+                x3ui_password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Соединение установлено</span>';
+                adminUtils.showToast('Соединение с X3UI успешно установлено', 'success');
+            } else {
+                statusElement.innerHTML = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Ошибка соединения</span>';
+                adminUtils.showToast('Не удалось подключиться к X3UI панели', 'danger');
+            }
+        })
+        .catch(error => {
+            statusElement.innerHTML = '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Ошибка запроса</span>';
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-wifi"></i> Проверить соединение';
+        });
+    });
+    
+    // Form validation
+    document.getElementById('editNodeForm').addEventListener('submit', function(e) {
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Сохранение...';
+        
+        // Re-enable button after 5 seconds in case of issues
+        setTimeout(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Сохранить изменения';
+        }, 5000);
+    });
+    
+    // Real-time form validation
+    const form = document.getElementById('editNodeForm');
+    const inputs = form.querySelectorAll('input[required], select[required]');
+    
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.value.trim()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    });
+    
+    // URL validation
+    document.getElementById('x3ui_url').addEventListener('input', function() {
+        const urlPattern = /^https?:\/\/.+/;
+        if (urlPattern.test(this.value)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else if (this.value.trim()) {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    });
+</script>
+{% endblock %} 

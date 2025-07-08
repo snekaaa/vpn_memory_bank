@@ -1,0 +1,764 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .config-section {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+    }
+    
+    .config-field {
+        margin-bottom: 1rem;
+    }
+    
+    .config-field label {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .provider-type-card {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .provider-type-card:hover {
+        border-color: #007bff;
+        background: #f8f9ff;
+    }
+    
+    .provider-type-card.selected {
+        border-color: #007bff;
+        background: #e7f3ff;
+    }
+    
+    .provider-type-card h6 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+    }
+    
+    .provider-type-card p {
+        margin: 0;
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .advanced-settings {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .form-help {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .sensitive-field {
+        position: relative;
+    }
+    
+    .sensitive-field .toggle-visibility {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+    }
+    
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    .form-section h5 {
+        color: #495057;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    
+    .submit-section {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        margin: 2rem -1.5rem -1.5rem -1.5rem;
+        border-top: 1px solid #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">
+            <i class="bi bi-plus-circle"></i> Добавить платежную систему
+        </h2>
+        <p class="text-muted mb-0">Создание нового платежного провайдера</p>
+    </div>
+    <a href="/admin/payment-providers" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <form id="createProviderForm" method="post" action="/admin/api/payment-providers">
+                    
+                    <!-- Основная информация -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-info-circle"></i> Основная информация</h5>
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Название провайдера</label>
+                            <input type="text" class="form-control" id="name" name="name" required
+                                   placeholder="Например: Основная Робокасса">
+                            <div class="form-help">Произвольное название для отображения в админке</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Тип платежной системы</label>
+                            <div id="providerTypes">
+                                {% for provider_type in provider_types %}
+                                <div class="provider-type-card" data-type="{{ provider_type.value }}">
+                                    <h6>{{ provider_type.name }}</h6>
+                                    <p>{{ _get_provider_description(provider_type.value) }}</p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" id="provider_type" name="provider_type" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Описание</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                      placeholder="Краткое описание провайдера (опционально)"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Конфигурация -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-gear"></i> Конфигурация</h5>
+                        
+                        <div id="configSection" class="config-section" style="display: none;">
+                            <!-- Поля конфигурации добавляются динамически -->
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="webhook_url" class="form-label">Webhook URL</label>
+                            <input type="url" class="form-control" id="webhook_url" name="webhook_url"
+                                   placeholder="https://example.com/webhook/payment">
+                            <div class="form-help">URL для получения уведомлений о платежах</div>
+                        </div>
+                    </div>
+                    
+                    <!-- URL Configuration -->
+                    <div class="form-section" id="urlSection" style="display: none;">
+                        <h5><i class="bi bi-link-45deg"></i> URL конфигурация</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="success_url" class="form-label">Success URL</label>
+                                    <input type="url" class="form-control" id="success_url" name="success_url"
+                                           placeholder="https://example.com/payment/success">
+                                    <div class="form-help">URL для перенаправления после успешной оплаты</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="failure_url" class="form-label">Failure URL</label>
+                                    <input type="url" class="form-control" id="failure_url" name="failure_url"
+                                           placeholder="https://example.com/payment/failure">
+                                    <div class="form-help">URL для перенаправления после неудачной оплаты</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="notification_url" class="form-label">Notification URL</label>
+                                    <input type="url" class="form-control" id="notification_url" name="notification_url"
+                                           placeholder="https://example.com/webhooks/freekassa">
+                                    <div class="form-help">URL для получения webhook уведомлений</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="notification_method" class="form-label">Метод уведомления</label>
+                                    <select class="form-select" id="notification_method" name="notification_method">
+                                        <option value="POST" selected>POST</option>
+                                        <option value="GET">GET</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Лимиты и комиссии -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-calculator"></i> Лимиты и комиссии</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="min_amount" class="form-label">Минимальная сумма</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="min_amount" name="min_amount" 
+                                               value="1.0" min="0" step="0.01">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="max_amount" class="form-label">Максимальная сумма</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="max_amount" name="max_amount" 
+                                               min="0" step="0.01" placeholder="Не ограничено">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="commission_percent" class="form-label">Комиссия (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="commission_percent" name="commission_percent" 
+                                               value="0.0" min="0" max="100" step="0.01">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="commission_fixed" class="form-label">Фиксированная комиссия</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="commission_fixed" name="commission_fixed" 
+                                               value="0.0" min="0" step="0.01">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Настройки -->
+                    <div class="form-section">
+                        <h5><i class="bi bi-sliders"></i> Настройки</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="priority" class="form-label">Приоритет</label>
+                                    <input type="number" class="form-control" id="priority" name="priority" 
+                                           value="100" min="1" max="999">
+                                    <div class="form-help">Чем меньше число, тем выше приоритет</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Статус</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active">
+                                        <label class="form-check-label" for="is_active">
+                                            Активен
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="is_test_mode" name="is_test_mode" checked>
+                                        <label class="form-check-label" for="is_test_mode">
+                                            Тестовый режим
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="is_default" name="is_default">
+                                        <label class="form-check-label" for="is_default">
+                                            По умолчанию для этого типа
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- URL конфигурация для FreeKassa -->
+                    <div class="form-section" id="urlSection" style="display: none;">
+                        <h5><i class="bi bi-link-45deg"></i> URL конфигурация</h5>
+                        
+                        <div class="mb-3">
+                            <label for="success_url" class="form-label">Success URL</label>
+                            <input type="url" class="form-control" id="success_url" name="success_url"
+                                   placeholder="https://example.com/payment/success">
+                            <div class="form-help">URL для перенаправления после успешной оплаты</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="failure_url" class="form-label">Failure URL</label>
+                            <input type="url" class="form-control" id="failure_url" name="failure_url"
+                                   placeholder="https://example.com/payment/failure">
+                            <div class="form-help">URL для перенаправления после неудачной оплаты</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notification_url" class="form-label">Notification URL</label>
+                            <input type="url" class="form-control" id="notification_url" name="notification_url"
+                                   placeholder="https://example.com/webhooks/freekassa">
+                            <div class="form-help">URL для получения webhook уведомлений от платежной системы</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notification_method" class="form-label">Метод уведомления</label>
+                            <select class="form-select" id="notification_method" name="notification_method">
+                                <option value="POST" selected>POST</option>
+                                <option value="GET">GET</option>
+                            </select>
+                            <div class="form-help">HTTP метод для отправки webhook уведомлений</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Лимиты и комиссии -->
+                    <div class="advanced-settings">
+                        <h5><i class="bi bi-calculator"></i> Лимиты и комиссии</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="min_amount" class="form-label">Минимальная сумма</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="min_amount" name="min_amount" 
+                                               value="0" min="0" step="0.01">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="max_amount" class="form-label">Максимальная сумма</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="max_amount" name="max_amount" 
+                                               min="0" step="0.01" placeholder="Не ограничено">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="commission_percent" class="form-label">Комиссия (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="commission_percent" name="commission_percent" 
+                                               value="0" min="0" max="100" step="0.01">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="commission_fixed" class="form-label">Фиксированная комиссия</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="commission_fixed" name="commission_fixed" 
+                                               value="0" min="0" step="0.01">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="submit-section">
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-primary" onclick="testConfiguration()">
+                                <i class="bi bi-play-circle"></i> Проверить конфигурацию
+                            </button>
+                            <div>
+                                <a href="/admin/payment-providers" class="btn btn-secondary me-2">Отмена</a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> Создать провайдера
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-question-circle"></i> Справка</h6>
+            </div>
+            <div class="card-body">
+                <div id="helpContent">
+                    <p class="text-muted">Выберите тип платежной системы для получения подробной справки по настройке.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Конфигурации для разных типов провайдеров
+const providerConfigs = {
+    robokassa: {
+        fields: [
+            {name: 'shop_id', label: 'Shop ID', type: 'text', required: true, placeholder: 'Идентификатор магазина'},
+            {name: 'password1', label: 'Пароль #1', type: 'password', required: true, placeholder: 'Пароль для создания платежей'},
+            {name: 'password2', label: 'Пароль #2', type: 'password', required: true, placeholder: 'Пароль для проверки результатов'},
+            {name: 'base_url', label: 'Base URL', type: 'url', value: 'https://auth.robokassa.ru/Merchant/Index.aspx', placeholder: 'URL для создания платежей'}
+        ],
+        help: `
+            <h6>Настройка Робокассы</h6>
+            <ol>
+                <li>Войдите в панель управления Робокассы</li>
+                <li>Скопируйте Shop ID из настроек магазина</li>
+                <li>Создайте или скопируйте пароли #1 и #2</li>
+                <li>Настройте URL результата и success/fail страницы</li>
+            </ol>
+            <p><strong>Webhook URL:</strong> укажите адрес для получения уведомлений о платежах</p>
+        `
+    },
+    yookassa: {
+        fields: [
+            {name: 'shop_id', label: 'Shop ID', type: 'text', required: true, placeholder: 'Идентификатор магазина'},
+            {name: 'api_key', label: 'API Key', type: 'password', required: true, placeholder: 'Секретный ключ API'}
+        ],
+        help: `
+            <h6>Настройка ЮKassa</h6>
+            <ol>
+                <li>Войдите в личный кабинет ЮKassa</li>
+                <li>Перейдите в раздел "Настройки" → "API"</li>
+                <li>Скопируйте Shop ID и секретный ключ</li>
+                <li>Настройте HTTP-уведомления</li>
+            </ol>
+            <p><strong>Важно:</strong> убедитесь, что HTTP-уведомления включены</p>
+        `
+    },
+    coingate: {
+        fields: [
+            {name: 'api_key', label: 'API Key', type: 'password', required: true, placeholder: 'API ключ CoinGate'},
+            {name: 'app_id', label: 'App ID', type: 'text', required: true, placeholder: 'Идентификатор приложения'}
+        ],
+        help: `
+            <h6>Настройка CoinGate</h6>
+            <ol>
+                <li>Зарегистрируйтесь на CoinGate</li>
+                <li>Создайте приложение в разделе API</li>
+                <li>Скопируйте API ключ и App ID</li>
+                <li>Настройте callback URL</li>
+            </ol>
+            <p><strong>Поддерживает:</strong> Bitcoin, Ethereum и другие криптовалюты</p>
+        `
+    },
+    freekassa: {
+        fields: [
+            {name: 'api_key', label: 'API Key', type: 'text', required: true, placeholder: '39373edd80c7cf6a29e12b0155291b09'},
+            {name: 'secret1', label: 'Секретное слово №1', type: 'password', required: true, placeholder: 'Для создания подписи платежей'},
+            {name: 'secret2', label: 'Секретное слово №2', type: 'password', required: true, placeholder: 'Для проверки уведомлений'},
+            {name: 'confirmation_mode', label: 'Режим подтверждения', type: 'checkbox', value: true, placeholder: 'Требовать подтверждение платежа'}
+        ],
+        help: `
+            <h6>Настройка FreeKassa</h6>
+            <ol>
+                <li>Зайдите в личный кабинет FreeKassa</li>
+                <li>Перейдите в раздел "Настройки" → "Настройки API"</li>
+                <li>Скопируйте API Key из раздела настроек</li>
+                <li>Найдите секретные слова №1 и №2 в настройках магазина</li>
+                <li>Настройте URL для уведомлений (webhooks)</li>
+            </ol>
+            <p><strong>Webhook URL:</strong> должен указывать на /webhooks/freekassa</p>
+            <p><strong>Тестовый режим:</strong> можете использовать тестовые данные для проверки</p>
+            <div class="alert alert-info mt-2">
+                <strong>Дополнительные настройки:</strong><br>
+                • Success URL: страница успешной оплаты<br>
+                • Failure URL: страница неудачной оплаты<br>  
+                • Notification URL: URL для webhook уведомлений<br>
+                • Лимиты и комиссии настраиваются ниже
+            </div>
+        `
+    }
+};
+
+// Обработчики событий
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработка выбора типа провайдера
+    document.querySelectorAll('.provider-type-card').forEach(card => {
+        card.addEventListener('click', function() {
+            selectProviderType(this.dataset.type);
+        });
+    });
+    
+    // Обработка формы
+    document.getElementById('createProviderForm').addEventListener('submit', handleSubmit);
+});
+
+function selectProviderType(type) {
+    // Обновляем визуальное выделение
+    document.querySelectorAll('.provider-type-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+    
+    // Устанавливаем значение
+    document.getElementById('provider_type').value = type;
+    
+    // Обновляем конфигурацию
+    updateConfigSection(type);
+    
+    // Показываем/скрываем URL секцию для FreeKassa
+    const urlSection = document.getElementById('urlSection');
+    if (type === 'freekassa') {
+        urlSection.style.display = 'block';
+    } else {
+        urlSection.style.display = 'none';
+    }
+    
+    // Обновляем справку
+    updateHelpContent(type);
+}
+
+function updateConfigSection(type) {
+    const configSection = document.getElementById('configSection');
+    const config = providerConfigs[type];
+    
+    if (!config) {
+        configSection.style.display = 'none';
+        return;
+    }
+    
+    let html = '<h6>Параметры подключения</h6>';
+    
+    config.fields.forEach(field => {
+        const required = field.required ? 'required' : '';
+        const value = field.value ? `value="${field.value}"` : '';
+        const checked = field.type === 'checkbox' && field.value ? 'checked' : '';
+        const isPassword = field.type === 'password';
+        const isCheckbox = field.type === 'checkbox';
+        
+        if (isCheckbox) {
+            html += `
+                <div class="config-field">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="${field.name}" 
+                               name="config_${field.name}" ${checked}>
+                        <label class="form-check-label" for="${field.name}">
+                            ${field.label}
+                        </label>
+                    </div>
+                    <div class="form-help">${field.placeholder || ''}</div>
+                </div>
+            `;
+        } else {
+        html += `
+            <div class="config-field">
+                <label for="${field.name}" class="form-label">
+                    ${field.label}
+                    ${field.required ? '<span class="text-danger">*</span>' : ''}
+                </label>
+                <div class="sensitive-field">
+                    <input type="${field.type}" class="form-control" id="${field.name}" 
+                           name="config_${field.name}" ${required} ${value}
+                           placeholder="${field.placeholder || ''}">
+                    ${isPassword ? `
+                        <button type="button" class="toggle-visibility" onclick="togglePasswordVisibility('${field.name}')">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        }
+    });
+    
+    configSection.innerHTML = html;
+    configSection.style.display = 'block';
+}
+
+function updateHelpContent(type) {
+    const helpContent = document.getElementById('helpContent');
+    const config = providerConfigs[type];
+    
+    if (config && config.help) {
+        helpContent.innerHTML = config.help;
+    } else {
+        helpContent.innerHTML = '<p class="text-muted">Справка для этого типа провайдера пока недоступна.</p>';
+    }
+}
+
+function togglePasswordVisibility(fieldName) {
+    const field = document.getElementById(fieldName);
+    const button = field.nextElementSibling;
+    const icon = button.querySelector('i');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        field.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+async function testConfiguration() {
+    const formData = new FormData(document.getElementById('createProviderForm'));
+    
+    // Собираем конфигурацию
+    const config = {};
+    for (const [key, value] of formData.entries()) {
+        if (key.startsWith('config_')) {
+            config[key.replace('config_', '')] = value;
+        }
+    }
+    
+    try {
+        // Создаем временного провайдера для тестирования
+        const testData = {
+            name: formData.get('name') || 'Тестовый провайдер',
+            provider_type: formData.get('provider_type'),
+            config: config,
+            is_active: false,
+            is_test_mode: true
+        };
+        
+        const response = await fetch('/admin/api/payment-providers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(testData)
+        });
+        
+        if (response.ok) {
+            const provider = await response.json();
+            
+            // Тестируем провайдера
+            const testResponse = await fetch(`/admin/api/payment-providers/${provider.id}/test`, {
+                method: 'POST'
+            });
+            
+            const testResult = await testResponse.json();
+            
+            // Удаляем тестового провайдера
+            await fetch(`/admin/api/payment-providers/${provider.id}`, {
+                method: 'DELETE'
+            });
+            
+            // Показываем результат
+            if (testResult.success) {
+                alert('✅ Конфигурация корректна!\n\n' + testResult.message);
+            } else {
+                alert('❌ Ошибка конфигурации:\n\n' + testResult.message);
+            }
+        } else {
+            alert('Ошибка при тестировании конфигурации');
+        }
+    } catch (error) {
+        console.error('Ошибка тестирования:', error);
+        alert('Ошибка при тестировании конфигурации');
+    }
+}
+
+async function handleSubmit(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    
+    // Собираем данные
+    const data = {
+        name: formData.get('name'),
+        provider_type: formData.get('provider_type'),
+        description: formData.get('description') || null,
+        webhook_url: formData.get('webhook_url') || null,
+        priority: parseInt(formData.get('priority')) || 100,
+        is_active: formData.has('is_active'),
+        is_test_mode: formData.has('is_test_mode'),
+        is_default: formData.has('is_default'),
+        min_amount: parseFloat(formData.get('min_amount')) || 0,
+        max_amount: formData.get('max_amount') ? parseFloat(formData.get('max_amount')) : null,
+        commission_percent: parseFloat(formData.get('commission_percent')) || 0,
+        commission_fixed: parseFloat(formData.get('commission_fixed')) || 0,
+        success_url: formData.get('success_url') || null,
+        failure_url: formData.get('failure_url') || null,
+        notification_url: formData.get('notification_url') || null,
+        notification_method: formData.get('notification_method') || 'POST',
+        config: {}
+    };
+    
+    // Собираем конфигурацию
+    for (const [key, value] of formData.entries()) {
+        if (key.startsWith('config_')) {
+            data.config[key.replace('config_', '')] = value;
+        }
+    }
+    
+    // Обрабатываем checkbox поля (они не попадают в FormData если не выбраны)
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][name^="config_"]');
+    checkboxes.forEach(checkbox => {
+        const configKey = checkbox.name.replace('config_', '');
+        data.config[configKey] = checkbox.checked;
+    });
+    
+    try {
+        const response = await fetch('/admin/api/payment-providers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            window.location.href = '/admin/payment-providers';
+        } else {
+            const error = await response.json();
+            alert('Ошибка при создании провайдера:\n\n' + (error.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        alert('Ошибка при создании провайдера');
+    }
+}
+
+// Функция для получения описания провайдера
+function _get_provider_description(type) {
+    const descriptions = {
+        robokassa: 'Популярная российская платежная система',
+        yookassa: 'Платежная система от Яндекса',
+        coingate: 'Платежи в криптовалютах',
+        paypal: 'Международная платежная система',
+        stripe: 'Современная платежная платформа',
+        sberbank: 'Эквайринг Сбербанка',
+        tinkoff: 'Эквайринг Тинькофф Банка'
+    };
+    return descriptions[type] || 'Описание не доступно';
+}
+</script>
+{% endblock %} 

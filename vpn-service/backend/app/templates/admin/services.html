@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Управление услугами</h2>
+        <p class="text-muted mb-0">Настройка планов подписок</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/services/create" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Создать услугу
+        </a>
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Services List -->
+<div class="row">
+    {% for service_id, service in services.items() %}
+    <div class="col-lg-6 col-md-6 mb-4">
+        <div class="card admin-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">{{ service.name }}</h5>
+                <div class="d-flex gap-2">
+                    {% if service.active %}
+                        <span class="badge bg-success">Активна</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Неактивна</span>
+                    {% endif %}
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-three-dots"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/admin/services/{{ service.id }}/edit">
+                                <i class="bi bi-pencil me-2"></i>Редактировать
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><form method="post" action="/admin/services/{{ service.id }}/toggle" class="d-inline">
+                                <button type="submit" class="dropdown-item text-warning">
+                                    <i class="bi bi-power me-2"></i>
+                                    {% if service.active %}Деактивировать{% else %}Активировать{% endif %}
+                                </button>
+                            </form></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><form method="post" action="/admin/services/{{ service.id }}/delete" class="d-inline" 
+                                    onsubmit="return confirm('Вы уверены, что хотите удалить услугу {{ service.name }}?');">
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="bi bi-trash me-2"></i>Удалить
+                                </button>
+                            </form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="text-muted mb-2">{{ service.description }}</p>
+                        <div class="d-flex align-items-center gap-3">
+                            <div>
+                                <small class="text-muted">Цена</small>
+                                <div class="fw-bold">{{ "{:,.0f}".format(service.price) }} ₽</div>
+                            </div>
+                            <div>
+                                <small class="text-muted">Срок</small>
+                                <div class="fw-bold">{{ service.duration }}</div>
+                            </div>
+                            {% if service.discount %}
+                            <div>
+                                <small class="text-muted">Скидка</small>
+                                <div class="fw-bold text-success">{{ service.discount }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="price-display">
+                            <div class="h4 mb-0">{{ "{:,.0f}".format(service.price) }} ₽</div>
+                            <small class="text-muted">{{ service.duration }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- No Services Message -->
+{% if not services %}
+<div class="text-center py-5">
+    <i class="bi bi-box-seam display-1 text-muted"></i>
+    <h4 class="mt-3">Нет услуг</h4>
+    <p class="text-muted">Создайте первую услугу для начала работы</p>
+    <a href="/admin/services/create" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Создать услугу
+    </a>
+</div>
+{% endif %}
+
+<!-- Service Plans Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Информация:</strong> Здесь отображаются все планы подписок, которые доступны пользователям в боте. 
+            Вы можете изменять цены, описания и активность услуг. Неактивные услуги не отображаются в боте.
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-card {
+    border: 1px solid #dee2e6;
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.admin-card:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.price-display {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    text-align: center;
+}
+
+.dropdown-toggle::after {
+    display: none;
+}
+</style>
+{% endblock %} 

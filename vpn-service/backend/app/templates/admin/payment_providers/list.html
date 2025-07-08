@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Управление платежными системами{% endblock %}
+
+{% block extra_css %}
+<style>
+    .provider-card {
+        border: none;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .provider-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .provider-status {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-active {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .config-preview {
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 0.75rem;
+        background: #f8f9fa;
+        padding: 0.5rem;
+        border-radius: 4px;
+        max-height: 100px;
+        overflow-y: auto;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">
+            <i class="bi bi-bank"></i> Управление платежными системами
+        </h2>
+        <p class="text-muted mb-0">Настройка и управление платежными провайдерами</p>
+    </div>
+    <div>
+        <a href="/admin/payment-providers/create" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Добавить систему
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card admin-card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Всего провайдеров</h6>
+                        <h3 class="card-title mb-0">{{ stats.total_providers }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-bank" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card admin-card stats-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Активных</h6>
+                        <h3 class="card-title mb-0">{{ stats.active_providers }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card admin-card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Платежей сегодня</h6>
+                        <h3 class="card-title mb-0">{{ stats.total_payments_today }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-credit-card" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Провайдеры -->
+<div class="row" id="providers-container">
+    {% if providers %}
+        {% for provider in providers %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="provider-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h5 class="mb-1">{{ provider.name }}</h5>
+                        <small class="text-muted">{{ provider.provider_type.title() }}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="provider-status status-{{ 'active' if provider.is_active else 'inactive' }}">
+                            {{ 'Активен' if provider.is_active else 'Отключен' }}
+                        </span>
+                    </div>
+                </div>
+                
+                {% if provider.description %}
+                <p class="text-muted small mb-3">{{ provider.description }}</p>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <strong>{{ provider.total_payments }}</strong>
+                            <br><small class="text-muted">Платежей</small>
+                        </div>
+                        <div class="col-6">
+                            <strong>{{ provider.priority }}</strong>
+                            <br><small class="text-muted">Приоритет</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if provider.masked_config %}
+                <div class="config-preview mb-3">
+                    {% for key, value in provider.masked_config.items() %}
+                    <div><strong>{{ key }}:</strong> {{ value }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <div class="provider-actions mt-3">
+                    <a href="/admin/payment-providers/{{ provider.id }}/edit" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Изменить
+                    </a>
+                    {% if provider.is_active %}
+                    <button class="btn btn-sm btn-outline-warning" onclick="toggleProvider({{ provider.id }}, false)">
+                        <i class="bi bi-pause"></i> Отключить
+                    </button>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline-success" onclick="toggleProvider({{ provider.id }}, true)">
+                        <i class="bi bi-play"></i> Включить
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteProvider({{ provider.id }})">
+                        <i class="bi bi-trash"></i> Удалить
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="bi bi-bank"></i>
+                <h4>Нет платежных систем</h4>
+                <p>Добавьте первую платежную систему для начала работы</p>
+                <a href="/admin/payment-providers/create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Добавить систему
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+async function toggleProvider(providerId, isActive) {
+    try {
+        const response = await fetch(`/admin/api/payment-providers/${providerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`Провайдер ${isActive ? 'включен' : 'отключен'} успешно!`);
+            location.reload();
+        } else {
+            alert(`Ошибка: ${result.detail}`);
+        }
+    } catch (error) {
+        alert('Ошибка при изменении статуса: ' + error.message);
+    }
+}
+
+async function deleteProvider(providerId) {
+    if (!confirm('Вы уверены, что хотите удалить этот провайдер?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/payment-providers/${providerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        if (response.ok) {
+            alert('Провайдер удален успешно!');
+            location.reload();
+        } else {
+            const result = await response.json();
+            alert(`Ошибка: ${result.detail}`);
+        }
+    } catch (error) {
+        alert('Ошибка при удалении: ' + error.message);
+    }
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,429 @@
+{% extends "../../base.html" %}
+
+{% block title %}VPN Ноды | VPN Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-hdd-network"></i> VPN Ноды</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/admin/nodes/create" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle"></i> Добавить ноду
+            </a>
+            <a href="/admin/nodes/dashboard" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-graph-up"></i> Мониторинг
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="healthCheckBtn">
+                <i class="bi bi-heart-pulse"></i> Здоровье
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="rebalanceBtn">
+                <i class="bi bi-arrow-repeat"></i> Балансировка
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<!-- Error Alert -->
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <strong>Ошибка!</strong> {{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<!-- System Health Summary -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card admin-card text-white {% if health_report.healthy_nodes == health_report.total_nodes %}stats-card success{% elif health_report.healthy_nodes > 0 %}stats-card warning{% else %}stats-card danger{% endif %}">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title">Здоровье системы</h5>
+                        <p class="card-text display-6 mb-0">{{ health_report.healthy_nodes }}/{{ health_report.total_nodes }}</p>
+                        <small>Здоровых нод</small>
+                    </div>
+                    <i class="bi bi-heart-pulse fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-card stats-card text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title">Активные ноды</h5>
+                        <p class="card-text display-6 mb-0">{{ health_report.active_nodes }}</p>
+                        <small>Из {{ health_report.total_nodes }} нод</small>
+                    </div>
+                    <i class="bi bi-server fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-card stats-card text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title">Пользователи</h5>
+                        <p class="card-text display-6 mb-0">{{ health_report.total_users }}</p>
+                        <small>Из {{ health_report.total_capacity }} мест</small>
+                    </div>
+                    <i class="bi bi-people fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-card text-white {% if health_report.load_percentage < 70 %}stats-card success{% elif health_report.load_percentage < 90 %}stats-card warning{% else %}stats-card danger{% endif %}">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title">Общая загрузка</h5>
+                        <p class="card-text display-6 mb-0">{{ health_report.load_percentage|round(1) }}%</p>
+                        <small>{{ health_report.total_users }} / {{ health_report.total_capacity }}</small>
+                    </div>
+                    <i class="bi bi-speedometer2 fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop Table View -->
+<div class="card admin-card desktop-table">
+    <div class="card-header">
+        <h5>Список VPN нод</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Локация</th>
+                    <th>Статус</th>
+                    <th>Здоровье</th>
+                    <th>Загрузка</th>
+                    <th>Приоритет</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes %}
+                <tr>
+                    <td class="fw-bold">#{{ node.id }}</td>
+                    <td>
+                        <div>
+                            <strong>{{ node.name }}</strong>
+                            {% if node.description %}
+                            <small class="text-muted d-block">{{ node.description }}</small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>{{ node.location or 'Не указана' }}</td>
+                    <td>
+                        <span class="badge {% if node.status == 'active' %}bg-success{% elif node.status == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ node.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if node.health_status == 'healthy' %}bg-success{% elif node.health_status == 'unknown' %}bg-secondary{% else %}bg-danger{% endif %}">
+                            {{ node.health_status }}
+                        </span>
+                        {% if node.last_health_check %}
+                        <small class="text-muted d-block">{{ node.last_health_check.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="progress mb-1">
+                            <div class="progress-bar {% if node.load_percentage < 70 %}bg-success{% elif node.load_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ node.load_percentage }}%" 
+                                 aria-valuenow="{{ node.load_percentage }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ node.load_percentage|round(1) }}%
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ node.current_users }} / {{ node.max_users }}</small>
+                    </td>
+                    <td>{{ node.priority }}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="/admin/nodes/{{ node.id }}" class="btn btn-sm btn-outline-primary" title="Просмотр">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="/admin/nodes/{{ node.id }}/edit" class="btn btn-sm btn-outline-secondary" title="Редактировать">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                    onclick="deleteNode({{ node.id }}, '{{ node.name }}')" title="Удалить">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile Cards View -->
+<div class="mobile-card">
+    {% for node in nodes %}
+    <div class="card admin-card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h6 class="card-title mb-1">{{ node.name }}</h6>
+                    {% if node.description %}
+                    <small class="text-muted">{{ node.description }}</small>
+                    {% endif %}
+                </div>
+                <div class="text-end">
+                    <span class="badge {% if node.status == 'active' %}bg-success{% elif node.status == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">
+                        {{ node.status }}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <small class="text-muted">Локация:</small><br>
+                    <strong>{{ node.location or 'Не указана' }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Здоровье:</small><br>
+                    <span class="badge {% if node.health_status == 'healthy' %}bg-success{% elif node.health_status == 'unknown' %}bg-secondary{% else %}bg-danger{% endif %}">
+                        {{ node.health_status }}
+                    </span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Загрузка:</small><br>
+                    <div class="progress">
+                        <div class="progress-bar {% if node.load_percentage < 70 %}bg-success{% elif node.load_percentage < 90 %}bg-warning{% else %}bg-danger{% endif %}" 
+                             style="width: {{ node.load_percentage }}%">
+                            {{ node.load_percentage|round(1) }}%
+                        </div>
+                    </div>
+                    <small class="text-muted">{{ node.current_users }} / {{ node.max_users }}</small>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Приоритет:</small><br>
+                    <strong>{{ node.priority }}</strong>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex">
+                <a href="/admin/nodes/{{ node.id }}" class="btn btn-outline-primary btn-sm flex-fill">
+                    <i class="bi bi-eye me-1"></i>Просмотр
+                </a>
+                <a href="/admin/nodes/{{ node.id }}/edit" class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-pencil me-1"></i>Изменить
+                </a>
+                <button type="button" class="btn btn-outline-danger btn-sm flex-fill" 
+                        onclick="deleteNode({{ node.id }}, '{{ node.name }}')">
+                    <i class="bi bi-trash me-1"></i>Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Load Distribution Charts -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5>Распределение нагрузки</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="loadChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5>Статус здоровья</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="healthChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Empty State -->
+{% if nodes|length == 0 %}
+<div class="card admin-card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-server text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3 text-muted">VPN ноды не найдены</h4>
+        <p class="text-muted">Добавьте первую ноду для начала работы</p>
+        <a href="/admin/nodes/create" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Добавить ноду
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+    // Load Distribution Chart
+    const loadCtx = document.getElementById('loadChart').getContext('2d');
+    const loadChart = new Chart(loadCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for stat in load_stats %}'{{ stat.name }}',{% endfor %}],
+            datasets: [{
+                label: 'Текущие пользователи',
+                data: [{% for stat in load_stats %}{{ stat.current_users }},{% endfor %}],
+                backgroundColor: [{% for stat in load_stats %}{% if stat.load_percentage < 70 %}'rgba(75, 192, 192, 0.6)'{% elif stat.load_percentage < 90 %}'rgba(255, 206, 86, 0.6)'{% else %}'rgba(255, 99, 132, 0.6)'{% endif %},{% endfor %}],
+                borderColor: [{% for stat in load_stats %}{% if stat.load_percentage < 70 %}'rgba(75, 192, 192, 1)'{% elif stat.load_percentage < 90 %}'rgba(255, 206, 86, 1)'{% else %}'rgba(255, 99, 132, 1)'{% endif %},{% endfor %}],
+                borderWidth: 1
+            }, {
+                label: 'Максимальная емкость',
+                data: [{% for stat in load_stats %}{{ stat.max_users }},{% endfor %}],
+                backgroundColor: 'rgba(200, 200, 200, 0.3)',
+                borderColor: 'rgba(200, 200, 200, 1)',
+                borderWidth: 1,
+                type: 'line'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Health Status Chart
+    const healthCtx = document.getElementById('healthChart').getContext('2d');
+    const healthChart = new Chart(healthCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Здоровые', 'Нездоровые', 'Неизвестно'],
+            datasets: [{
+                data: [
+                    {{ health_report.healthy_nodes }}, 
+                    {{ health_report.unhealthy_nodes }},
+                    {{ health_report.total_nodes - health_report.healthy_nodes - health_report.unhealthy_nodes }}
+                ],
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(200, 200, 200, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(200, 200, 200, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+    
+    // Delete node function
+    async function deleteNode(nodeId, nodeName) {
+        if (!confirm(`Вы уверены, что хотите удалить ноду "${nodeName}"?`)) {
+            return;
+        }
+        
+        const spinner = adminUtils.showSpinner();
+        
+        try {
+            const formData = new FormData();
+            formData.append('migrate_users', 'true');
+            
+            const response = await fetch(`/admin/nodes/${nodeId}/delete`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                adminUtils.showToast(`Нода "${nodeName}" успешно удалена`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                adminUtils.showToast('Ошибка при удалении ноды', 'danger');
+            }
+        } catch (error) {
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        } finally {
+            adminUtils.hideSpinner(spinner);
+        }
+    }
+    
+    // Health check button
+    document.getElementById('healthCheckBtn').addEventListener('click', async function() {
+        const spinner = adminUtils.showSpinner();
+        
+        try {
+            const response = await fetch('/admin/nodes/health-check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                adminUtils.showToast('Проверка здоровья запущена', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                adminUtils.showToast('Ошибка при запуске проверки здоровья', 'danger');
+            }
+        } catch (error) {
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        } finally {
+            adminUtils.hideSpinner(spinner);
+        }
+    });
+    
+    // Rebalance button
+    document.getElementById('rebalanceBtn').addEventListener('click', async function() {
+        if (!confirm('Запустить ребалансировку пользователей между нодами?')) {
+            return;
+        }
+        
+        const spinner = adminUtils.showSpinner();
+        
+        try {
+            const response = await fetch('/admin/nodes/rebalance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                adminUtils.showToast('Ребалансировка запущена', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                adminUtils.showToast('Ошибка при запуске ребалансировки', 'danger');
+            }
+        } catch (error) {
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        } finally {
+            adminUtils.hideSpinner(spinner);
+        }
+    });
+</script>
+{% endblock %} 

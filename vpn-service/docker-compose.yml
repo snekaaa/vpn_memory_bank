@@ -1,0 +1,77 @@
+version: '3'
+
+services:
+  bot:
+    build:
+      context: ./bot
+    restart: always
+    env_file:
+      - ./bot/.env
+    volumes:
+      - ./bot:/app
+      - ./backend:/app/backend
+      - bot_data:/app/data
+    command: >
+      bash -c "pip install sqlalchemy asyncpg &&
+               python main.py"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ADMIN_TELEGRAM_IDS=352313872
+      - ADMIN_USERNAMES=av_nosov,seo2seo
+      - USE_SIMPLE_STORAGE=true
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - db
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql+asyncpg://vpn_user:vpn_password@db:5432/vpn_db
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=secure_admin_123
+      # Robokassa settings
+      - ROBOKASSA_SHOP_ID=bezlagov
+      - ROBOKASSA_PASSWORD1=KXS28SKL9y5V9NVQiRSG
+      - ROBOKASSA_PASSWORD2=ITixW86d0piZmf7FB1KV
+      - ROBOKASSA_TEST_MODE=true
+      - ROBOKASSA_HASH_TYPE=MD5
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=vpn_password
+      - POSTGRES_USER=vpn_user
+      - POSTGRES_DB=vpn_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vpn_user -d vpn_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bot_data:
+  backend_data:
+  postgres_data: 

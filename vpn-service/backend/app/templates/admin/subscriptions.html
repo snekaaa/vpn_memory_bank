@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Управление подписками</h2>
+        <p class="text-muted mb-0">Всего подписок: {{ total }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Всего подписок</h6>
+                        <h3 class="card-title mb-0">{{ stats.total or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-calendar-check" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Активные</h6>
+                        <h3 class="card-title mb-0">{{ stats.active or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Истекшие</h6>
+                        <h3 class="card-title mb-0">{{ stats.expired or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-clock" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Отменённые</h6>
+                        <h3 class="card-title mb-0">{{ stats.cancelled or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-x-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card admin-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label for="status" class="form-label">Статус подписки</label>
+                <select name="status" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
+                    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Истекшие</option>
+                    <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Отменённые</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="size" class="form-label">Показывать</label>
+                <select class="form-select" name="size">
+                    <option value="25" {% if size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if size == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel me-1"></i>Применить
+                </button>
+                <a href="/admin/subscriptions" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Desktop Table View -->
+<div class="card admin-card desktop-table">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Пользователь</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Цена</th>
+                    <th>Начало</th>
+                    <th>Окончание</th>
+                    <th>Автопродление</th>
+                    <th>Создана</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subscription in subscriptions %}
+                <tr>
+                    <td class="fw-bold">#{{ subscription.id }}</td>
+                    <td>
+                        <strong>ID {{ subscription.user_id }}</strong>
+                    </td>
+                    <td>
+                        <span class="badge bg-info">{{ subscription.subscription_type.value }}</span>
+                    </td>
+                    <td>
+                        {% if subscription.status.value == 'active' %}
+                            <span class="badge bg-success">Активная</span>
+                        {% elif subscription.status.value == 'expired' %}
+                            <span class="badge bg-warning">Истекшая</span>
+                        {% elif subscription.status.value == 'cancelled' %}
+                            <span class="badge bg-danger">Отменённая</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ subscription.status.value }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ subscription.price }} {{ subscription.currency }}</td>
+                    <td>
+                        {% if subscription.start_date %}
+                            <small>{{ subscription.start_date.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if subscription.end_date %}
+                            <small>{{ subscription.end_date.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if subscription.auto_renewal %}
+                            <span class="badge bg-success">Да</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Нет</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if subscription.created_at %}
+                            <small>{{ subscription.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>Подписки не найдены
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile Cards View -->
+<div class="mobile-card">
+    {% for subscription in subscriptions %}
+    <div class="card admin-card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h6 class="card-title mb-1">Подписка #{{ subscription.id }}</h6>
+                    <small class="text-muted">Пользователь ID {{ subscription.user_id }}</small>
+                </div>
+                <div class="text-end">
+                    {% if subscription.status.value == 'active' %}
+                        <span class="badge bg-success">Активная</span>
+                    {% elif subscription.status.value == 'expired' %}
+                        <span class="badge bg-warning">Истекшая</span>
+                    {% elif subscription.status.value == 'cancelled' %}
+                        <span class="badge bg-danger">Отменённая</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ subscription.status.value }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <small class="text-muted">Тип:</small><br>
+                    <span class="badge bg-info">{{ subscription.subscription_type.value }}</span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Цена:</small><br>
+                    <strong>{{ subscription.price }} {{ subscription.currency }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Начало:</small><br>
+                    {% if subscription.start_date %}
+                        <small>{{ subscription.start_date.strftime('%d.%m.%Y') }}</small>
+                    {% else %}
+                        <small class="text-muted">-</small>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Окончание:</small><br>
+                    {% if subscription.end_date %}
+                        <small>{{ subscription.end_date.strftime('%d.%m.%Y') }}</small>
+                    {% else %}
+                        <small class="text-muted">-</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card admin-card">
+        <div class="card-body text-center text-muted py-4">
+            <i class="bi bi-inbox me-2"></i>Подписки не найдены
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if total > size %}
+<nav aria-label="Навигация по подпискам" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}&size={{ size }}">
+                <i class="bi bi-chevron-left"></i> Назад
+            </a>
+        </li>
+        {% endif %}
+        
+        <li class="page-item active">
+            <span class="page-link">{{ page }}</span>
+        </li>
+        
+        {% if has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}&size={{ size }}">
+                Вперёд <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %} 

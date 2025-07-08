@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Управление платежами</h2>
+        <p class="text-muted mb-0">Всего платежей: {{ total }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/payments/create" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Создать платеж
+        </a>
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Всего платежей</h6>
+                        <h3 class="card-title mb-0">{{ stats.total or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-credit-card" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Завершённые</h6>
+                        <h3 class="card-title mb-0">{{ stats.completed or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">В ожидании</h6>
+                        <h3 class="card-title mb-0">{{ stats.pending or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-clock" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Неудачные</h6>
+                        <h3 class="card-title mb-0">{{ stats.failed or 0 }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-x-circle" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Revenue Card -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card admin-card stats-card info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Общая сумма завершённых платежей</h6>
+                        <h3 class="card-title mb-0">{{ "{:,.2f}".format(stats.total_amount or 0) }} ₽</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-currency-exchange" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card admin-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label for="status" class="form-label">Статус платежа</label>
+                <select name="status" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="SUCCEEDED" {% if status_filter == 'SUCCEEDED' %}selected{% endif %}>Завершённые</option>
+                    <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>В ожидании</option>
+                    <option value="FAILED" {% if status_filter == 'FAILED' %}selected{% endif %}>Неудачные</option>
+                    <option value="CANCELLED" {% if status_filter == 'CANCELLED' %}selected{% endif %}>Отменённые</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="size" class="form-label">Показывать</label>
+                <select class="form-select" name="size">
+                    <option value="25" {% if size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if size == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel me-1"></i>Применить
+                </button>
+                <a href="/admin/payments" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Desktop Table View -->
+<div class="card admin-card desktop-table">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Пользователь</th>
+                    <th>Услуга</th>
+                    <th>Сумма</th>
+                    <th>Статус</th>
+                    <th>Метод</th>
+                    <th>Robokassa ID</th>
+                    <th>Создан</th>
+                    <th>Обновлён</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr class="clickable-row" onclick="window.location.href='/admin/payments/{{ payment.id }}'" style="cursor: pointer;">
+                    <td class="fw-bold">#{{ payment.id }}</td>
+                    <td>
+                        <strong>ID {{ payment.user_id }}</strong>
+                    </td>
+                    <td>
+                        {% if payment.description %}
+                            <small class="text-primary">{{ payment.description }}</small>
+                        {% elif payment.subscription %}
+                            <small class="text-primary">{{ payment.subscription.plan_name }}</small>
+                        {% else %}
+                            <small class="text-muted">Не указана</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ "{:,.2f}".format(payment.amount) }} {{ payment.currency }}</td>
+                    <td>
+                        {% if payment.status.value == 'SUCCEEDED' %}
+                            <span class="badge bg-success">Завершён</span>
+                        {% elif payment.status.value == 'PENDING' %}
+                            <span class="badge bg-warning">В ожидании</span>
+                        {% elif payment.status.value == 'PROCESSING' %}
+                            <span class="badge bg-info">Обработка</span>
+                        {% elif payment.status.value == 'FAILED' %}
+                            <span class="badge bg-danger">Неудача</span>
+                        {% elif payment.status.value == 'CANCELLED' %}
+                            <span class="badge bg-secondary">Отменён</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ payment.status.value }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-info">{{ payment.payment_method.value }}</span>
+                    </td>
+                    <td>
+                        {% if payment.external_id %}
+                            <code>{{ payment.external_id[:20] }}{% if payment.external_id|length > 20 %}...{% endif %}</code>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if payment.created_at %}
+                            <small>{{ payment.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if payment.paid_at %}
+                            <small>{{ payment.paid_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>Платежи не найдены
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile Cards View -->
+<div class="mobile-card">
+    {% for payment in payments %}
+    <div class="card admin-card mb-3 clickable-row" onclick="window.location.href='/admin/payments/{{ payment.id }}'" style="cursor: pointer;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h6 class="card-title mb-1">Платёж #{{ payment.id }}</h6>
+                    <small class="text-muted">Пользователь ID {{ payment.user_id }}</small>
+                </div>
+                <div class="text-end">
+                    {% if payment.status.value == 'SUCCEEDED' %}
+                        <span class="badge bg-success">Завершён</span>
+                    {% elif payment.status.value == 'PENDING' %}
+                        <span class="badge bg-warning">В ожидании</span>
+                    {% elif payment.status.value == 'PROCESSING' %}
+                        <span class="badge bg-info">Обработка</span>
+                    {% elif payment.status.value == 'FAILED' %}
+                        <span class="badge bg-danger">Неудача</span>
+                    {% elif payment.status.value == 'CANCELLED' %}
+                        <span class="badge bg-secondary">Отменён</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ payment.status.value }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <small class="text-muted">Сумма:</small><br>
+                    <strong>{{ "{:,.2f}".format(payment.amount) }} {{ payment.currency }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Метод:</small><br>
+                    <span class="badge bg-info">{{ payment.payment_method.value }}</span>
+                </div>
+                <div class="col-12">
+                    <small class="text-muted">Услуга:</small><br>
+                    {% if payment.subscription %}
+                        <small class="text-primary">{{ payment.subscription.plan_name }}</small>
+                    {% else %}
+                        <small class="text-muted">Не указана</small>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Создан:</small><br>
+                    {% if payment.created_at %}
+                        <small>{{ payment.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                    {% else %}
+                        <small class="text-muted">-</small>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Оплачен:</small><br>
+                    {% if payment.paid_at %}
+                        <small>{{ payment.paid_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                    {% else %}
+                        <small class="text-muted">-</small>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if payment.external_id %}
+            <div class="mt-2">
+                <small class="text-muted">External ID:</small><br>
+                <code class="small">{{ payment.external_id }}</code>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="card admin-card">
+        <div class="card-body text-center text-muted py-4">
+            <i class="bi bi-inbox me-2"></i>Платежи не найдены
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if total > size %}
+<nav aria-label="Навигация по платежам" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}&size={{ size }}">
+                <i class="bi bi-chevron-left"></i> Назад
+            </a>
+        </li>
+        {% endif %}
+        
+        <li class="page-item active">
+            <span class="page-link">{{ page }}</span>
+        </li>
+        
+        {% if has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}&size={{ size }}">
+                Вперёд <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %} 

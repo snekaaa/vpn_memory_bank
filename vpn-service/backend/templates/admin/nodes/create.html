@@ -1,0 +1,275 @@
+{% extends "../../base.html" %}
+
+{% block title %}Добавить VPN Ноду | VPN Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-plus-circle"></i> Добавить VPN Ноду</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/admin/nodes" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Назад к списку
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<div class="card admin-card">
+    <div class="card-header">
+        <h5><i class="bi bi-plus-circle me-2"></i>Данные новой ноды</h5>
+    </div>
+    <div class="card-body">
+        <form action="/admin/nodes/create" method="post" id="createNodeForm">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="mb-3"><i class="bi bi-info-circle me-2"></i>Основная информация</h5>
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Название ноды *</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="form-text">Уникальное название ноды (например, "VPN-EU-1")</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Описание</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        <div class="form-text">Краткое описание ноды и её назначения</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Локация</label>
+                        <input type="text" class="form-control" id="location" name="location">
+                        <div class="form-text">Географическое расположение сервера (например, "Германия, Франкфурт")</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <h5 class="mb-3"><i class="bi bi-gear me-2"></i>Настройки X3UI</h5>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_url" class="form-label">URL X3UI панели *</label>
+                        <input type="url" class="form-control" id="x3ui_url" name="x3ui_url" required>
+                        <div class="form-text">Полный URL с протоколом и портом (например, "https://server.com:2053")</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_username" class="form-label">Имя пользователя *</label>
+                        <input type="text" class="form-control" id="x3ui_username" name="x3ui_username" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="x3ui_password" class="form-label">Пароль *</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="x3ui_password" name="x3ui_password" required>
+                            <button class="btn btn-outline-secondary" type="button" id="showPassword">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Тест соединения</label>
+                        <div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="testConnection">
+                                <i class="bi bi-wifi"></i> Проверить соединение
+                            </button>
+                            <span id="connectionStatus" class="ms-2"></span>
+                        </div>
+                        <div class="form-text">Рекомендуется проверить соединение перед созданием</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <h5 class="mb-3"><i class="bi bi-diagram-3 me-2"></i>Настройки балансировки нагрузки</h5>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="max_users" class="form-label">Максимум пользователей</label>
+                        <input type="number" class="form-control" id="max_users" name="max_users" value="1000" min="1" max="10000">
+                        <div class="form-text">Максимальное количество пользователей на ноде</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Приоритет</label>
+                        <input type="number" class="form-control" id="priority" name="priority" value="100" min="1" max="1000">
+                        <div class="form-text">Чем выше значение, тем выше приоритет при распределении</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="weight" class="form-label">Вес</label>
+                        <input type="number" class="form-control" id="weight" name="weight" value="1.0" min="0.1" max="10" step="0.1">
+                        <div class="form-text">Множитель нагрузки (1.0 = стандартный, 0.5 = половина)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="/admin/nodes" class="btn btn-secondary me-md-2">
+                    <i class="bi bi-x-lg me-1"></i>Отмена
+                </a>
+                <button type="submit" class="btn btn-primary" id="createBtn">
+                    <i class="bi bi-plus-circle me-1"></i>Создать ноду
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card admin-card mt-4">
+    <div class="card-header">
+        <h5><i class="bi bi-info-circle me-2"></i>Информация о создании ноды</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <p class="mb-3">После создания ноды система автоматически:</p>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Проверит подключение к X3UI панели</li>
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Проверит здоровье ноды</li>
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Добавит ноду в пул балансировки нагрузки</li>
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Начнет мониторинг состояния ноды</li>
+                </ul>
+                <p class="text-muted">
+                    Новые пользователи будут автоматически распределяться между всеми активными нодами 
+                    в зависимости от приоритета и текущей нагрузки.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-lightbulb me-1"></i>Советы:</h6>
+                    <ul class="small mb-0">
+                        <li>Используйте HTTPS для безопасности</li>
+                        <li>Установите разные приоритеты для разных локаций</li>
+                        <li>Регулярно проверяйте здоровье нод</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Show/hide password
+    document.getElementById('showPassword').addEventListener('click', function() {
+        const passwordField = document.getElementById('x3ui_password');
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+        this.innerHTML = type === 'password' ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+    });
+    
+    // Test connection
+    document.getElementById('testConnection').addEventListener('click', function() {
+        const statusElement = document.getElementById('connectionStatus');
+        const button = this;
+        const url = document.getElementById('x3ui_url').value;
+        const username = document.getElementById('x3ui_username').value;
+        const password = document.getElementById('x3ui_password').value;
+        
+        if (!url || !username || !password) {
+            adminUtils.showToast('Заполните все поля X3UI для проверки соединения', 'warning');
+            return;
+        }
+        
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Проверка...';
+        statusElement.innerHTML = '';
+        
+        // Simulate test connection
+        fetch('/admin/api/test-x3ui-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                x3ui_url: url,
+                x3ui_username: username,
+                x3ui_password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Соединение установлено</span>';
+                adminUtils.showToast('Соединение с X3UI успешно установлено', 'success');
+            } else {
+                statusElement.innerHTML = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Ошибка соединения</span>';
+                adminUtils.showToast('Не удалось подключиться к X3UI панели', 'danger');
+            }
+        })
+        .catch(error => {
+            statusElement.innerHTML = '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Ошибка запроса</span>';
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-wifi"></i> Проверить соединение';
+        });
+    });
+    
+    // Form validation
+    document.getElementById('createNodeForm').addEventListener('submit', function(e) {
+        const createBtn = document.getElementById('createBtn');
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Создание...';
+        
+        // Re-enable button after 10 seconds in case of issues
+        setTimeout(() => {
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Создать ноду';
+        }, 10000);
+    });
+    
+    // Real-time form validation
+    const form = document.getElementById('createNodeForm');
+    const inputs = form.querySelectorAll('input[required]');
+    
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.value.trim()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    });
+    
+    // URL validation
+    document.getElementById('x3ui_url').addEventListener('input', function() {
+        const urlPattern = /^https?:\/\/.+/;
+        if (urlPattern.test(this.value)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else if (this.value.trim()) {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    });
+    
+    // Auto-fill name based on location
+    document.getElementById('location').addEventListener('input', function() {
+        const nameField = document.getElementById('name');
+        if (!nameField.value && this.value) {
+            const location = this.value.split(',')[0].trim();
+            nameField.value = 'VPN-' + location.replace(/\s/g, '-');
+        }
+    });
+</script>
+{% endblock %} 

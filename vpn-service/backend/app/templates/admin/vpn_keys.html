@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Управление VPN ключами</h2>
+        <p class="text-muted mb-0">Всего ключей: {{ keys_data.total }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card admin-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="status" class="form-label">Статус</label>
+                <select class="form-select" name="status">
+                    <option value="">Все статусы</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Неактивные</option>
+                    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Истекшие</option>
+                    <option value="revoked" {% if status_filter == 'revoked' %}selected{% endif %}>Отозванные</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="size" class="form-label">Показывать</label>
+                <select class="form-select" name="size">
+                    <option value="25" {% if keys_data.size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if keys_data.size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if keys_data.size == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel me-1"></i>Применить
+                </button>
+                <a href="/admin/vpn-keys" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Desktop Table View -->
+<div class="card admin-card desktop-table">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название ключа</th>
+                    <th>Пользователь</th>
+                    <th>VLESS Ключ</th>
+                    <th>Client Email</th>
+                    <th>Client ID</th>
+                    <th>Нода</th>
+                    <th>Статус</th>
+                    <th>Трафик</th>
+                    <th>Создан</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key in keys_data['items'] %}
+                <tr id="key-row-{{ key.id }}">
+                    <td class="fw-bold">#{{ key.id }}</td>
+                    <td>
+                        <code class="text-truncate" style="max-width: 150px;">{{ key.key_name }}</code>
+                    </td>
+                    <td>
+                        {% if key.user_username %}
+                        <div>
+                            <small>@{{ key.user_username }}</small><br>
+                            <code class="text-muted">{{ key.user_telegram_id }}</code>
+                        </div>
+                        {% else %}
+                        <code class="text-muted">{{ key.user_telegram_id }}</code>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if key.vless_url %}
+                        <div class="d-flex align-items-center">
+                            <code class="text-truncate" style="max-width: 200px; font-size: 0.8em;">
+                                {{ key.vless_url[:50] }}...
+                            </code>
+                            <button class="btn btn-sm btn-outline-primary ms-2" 
+                                    onclick="copyToClipboard('{{ key.vless_url }}')"
+                                    title="Копировать VLESS ключ">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        {% else %}
+                        <span class="text-muted">Нет данных</span>
+                        {% endif %}
+                    </td>
+                    <td><code class="text-truncate" style="max-width:150px;">{{ key.client_email }}</code></td>
+                    <td><code>{{ key.client_id }}</code></td>
+                    <td>
+                        {% if key.node_info %}
+                        <div>
+                            <strong>{{ key.node_info.name }}</strong><br>
+                            <small class="text-muted">
+                                ID: {{ key.node_info.id }} | 
+                                Приоритет: {{ key.node_info.priority or 'N/A' }}
+                            </small>
+                        </div>
+                        {% else %}
+                        <span class="text-muted">Нет данных</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if key.status == 'active' %}
+                        <span class="badge bg-success">Активен</span>
+                        {% elif key.status == 'inactive' %}
+                        <span class="badge bg-secondary">Неактивен</span>
+                        {% elif key.status == 'expired' %}
+                        <span class="badge bg-warning">Истёк</span>
+                        {% elif key.status == 'revoked' %}
+                        <span class="badge bg-danger">Отозван</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small>
+                            {% if key.traffic_gb > 0 %}
+                            <strong>{{ key.traffic_gb }} ГБ</strong><br>
+                            <span class="text-muted">
+                                ↓{{ (key.total_download / 1024**3)|round(2) }} 
+                                ↑{{ (key.total_upload / 1024**3)|round(2) }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">Нет данных</span>
+                            {% endif %}
+                        </small>
+                    </td>
+                    <td>
+                        {% if key.created_at %}
+                        <small>{{ key.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        {% else %}
+                        <small class="text-muted">Неизвестно</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Mobile Cards View -->
+<div class="mobile-card">
+    {% for key in keys_data['items'] %}
+    <div class="card admin-card mb-3" id="key-card-{{ key.id }}">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h6 class="card-title mb-1">
+                        Key #{{ key.id }}
+                    </h6>
+                    <small class="text-muted">{{ (key.key_name[:20] + '...') if key.key_name else 'Без имени' }}</small>
+                </div>
+                <div class="text-end">
+                    {% if key.status == 'active' %}
+                    <span class="badge bg-success">Активен</span>
+                    {% elif key.status == 'inactive' %}
+                    <span class="badge bg-secondary">Неактивен</span>
+                    {% elif key.status == 'expired' %}
+                    <span class="badge bg-warning">Истёк</span>
+                    {% elif key.status == 'revoked' %}
+                    <span class="badge bg-danger">Отозван</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <small class="text-muted">Пользователь:</small><br>
+                    {% if key.user_username %}
+                    <strong>@{{ key.user_username }}</strong>
+                    {% else %}
+                    <code>{{ key.user_telegram_id }}</code>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Трафик:</small><br>
+                    {% if key.traffic_gb > 0 %}
+                    <strong>{{ key.traffic_gb }} ГБ</strong>
+                    {% else %}
+                    <span class="text-muted">Нет данных</span>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Создан:</small><br>
+                    {% if key.created_at %}
+                    <small>{{ key.created_at.strftime('%d.%m.%Y') }}</small>
+                    {% else %}
+                    <small class="text-muted">Неизвестно</small>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <small class="text-muted">VLESS Ключ:</small><br>
+                    {% if key.vless_url %}
+                    <div class="d-flex align-items-center">
+                        <code class="text-truncate" style="font-size: 0.7em; max-width: 250px;">
+                            {{ key.vless_url[:60] }}...
+                        </code>
+                        <button class="btn btn-sm btn-outline-primary ms-2" 
+                                onclick="copyToClipboard('{{ key.vless_url }}')"
+                                title="Копировать">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    {% else %}
+                    <span class="text-muted">Нет данных</span>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Нода:</small><br>
+                    {% if key.node_info %}
+                    <strong>{{ key.node_info.name }}</strong><br>
+                    <small class="text-muted">ID: {{ key.node_info.id }}</small>
+                    {% else %}
+                    <span class="text-muted">Нет данных</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if keys_data.pages > 1 %}
+<nav aria-label="VPN Keys pagination">
+    <ul class="pagination justify-content-center">
+        <!-- Previous -->
+        {% if keys_data.page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ keys_data.page - 1 }}&size={{ keys_data.size }}&status={{ status_filter }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Page numbers -->
+        {% for page_num in range(1, keys_data.pages + 1) %}
+        {% if page_num == keys_data.page %}
+        <li class="page-item active">
+            <span class="page-link">{{ page_num }}</span>
+        </li>
+        {% elif page_num <= 3 or page_num > keys_data.pages - 3 or (page_num >= keys_data.page - 1 and page_num <= keys_data.page + 1) %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_num }}&size={{ keys_data.size }}&status={{ status_filter }}">{{ page_num }}</a>
+        </li>
+        {% elif page_num == 4 or page_num == keys_data.pages - 3 %}
+        <li class="page-item disabled">
+            <span class="page-link">...</span>
+        </li>
+        {% endif %}
+        {% endfor %}
+        
+        <!-- Next -->
+        {% if keys_data.page < keys_data.pages %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ keys_data.page + 1 }}&size={{ keys_data.size }}&status={{ status_filter }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- Empty State -->
+{% if keys_data.total == 0 %}
+<div class="card admin-card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-key text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3 text-muted">VPN ключи не найдены</h4>
+        <p class="text-muted">Измените фильтры или проверьте базу данных</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Функции деактивации и перегенерации ключей удалены согласно требованиям
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        adminUtils.showToast('VLESS ключ скопирован в буфер обмена', 'success');
+    }).catch(err => {
+        console.error('Ошибка копирования: ', err);
+        adminUtils.showToast('Ошибка копирования в буфер обмена', 'danger');
+    });
+}
+</script>
+{% endblock %} 

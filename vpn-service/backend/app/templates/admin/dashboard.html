@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Dashboard</h2>
+        <p class="text-muted mb-0">Обзор состояния VPN сервиса</p>
+    </div>
+    <div class="text-end">
+        <small class="text-muted">Последнее обновление:</small><br>
+        <strong id="lastUpdate"></strong>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Всего пользователей</h6>
+                        <h3 class="card-title mb-0">{{ stats.total_users }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-people" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Активные пользователи</h6>
+                        <h3 class="card-title mb-0">{{ stats.active_users }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-person-check" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">VPN ключи</h6>
+                        <h3 class="card-title mb-0">{{ stats.active_vpn_keys }}/{{ stats.total_vpn_keys }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-key" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Трафик</h6>
+                        <h3 class="card-title mb-0">{{ stats.total_traffic_gb }} ГБ</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-graph-up" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second Row Stats -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Подписки</h6>
+                        <h3 class="card-title mb-0">{{ stats.active_subscriptions }}/{{ stats.total_subscriptions }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-calendar-check" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Платежи</h6>
+                        <h3 class="card-title mb-0">{{ stats.completed_payments }}/{{ stats.total_payments }}</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-credit-card" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Доходы</h6>
+                        <h3 class="card-title mb-0">{{ "%.0f"|format(stats.total_revenue) }} ₽</h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-currency-exchange" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card admin-card stats-card secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Средний чек</h6>
+                        <h3 class="card-title mb-0">
+                            {% if stats.completed_payments > 0 %}
+                                {{ "%.0f"|format(stats.total_revenue / stats.completed_payments) }} ₽
+                            {% else %}
+                                0 ₽
+                            {% endif %}
+                        </h3>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-calculator" style="font-size: 2.5rem; opacity: 0.7;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card admin-card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-activity me-2"></i>
+                    Активность за последние 24 часа
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ stats.recent_registrations }}</h4>
+                        <p class="text-muted mb-0">Новых регистраций</p>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ stats.recent_connections }}</h4>
+                        <p class="text-muted mb-0">Новых подключений</p>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Быстрые действия</h6>
+                        <div class="d-grid gap-2">
+                            <a href="/admin/users" class="btn btn-outline-primary">
+                                <i class="bi bi-people me-2"></i>Управление пользователями
+                            </a>
+                            <a href="/admin/vpn-keys" class="btn btn-outline-success">
+                                <i class="bi bi-key me-2"></i>Управление VPN ключами
+                            </a>
+                            <a href="/admin/services" class="btn btn-outline-info">
+                                <i class="bi bi-calendar-check me-2"></i>Планы подписок
+                            </a>
+                            <a href="/admin/payments" class="btn btn-outline-warning">
+                                <i class="bi bi-credit-card me-2"></i>Платежи
+                            </a>
+                            <a href="/admin/payment-providers" class="btn btn-outline-warning">
+                                <i class="bi bi-credit-card me-2"></i>Платежные системы
+                            </a>
+                            
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Системные ссылки</h6>
+                        <div class="d-grid gap-2">
+                            <a href="/docs" target="_blank" class="btn btn-outline-info">
+                                <i class="bi bi-book me-2"></i>API документация
+                            </a>
+                            <a href="/health" target="_blank" class="btn btn-outline-secondary">
+                                <i class="bi bi-heart-pulse me-2"></i>Проверка здоровья
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-4">
+        <div class="card admin-card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Системные предупреждения
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if stats.blocked_users > 0 %}
+                <div class="alert alert-warning" role="alert">
+                    <small><strong>{{ stats.blocked_users }}</strong> заблокированных пользователей</small>
+                </div>
+                {% endif %}
+                
+                {% if stats.total_vpn_keys - stats.active_vpn_keys > 0 %}
+                <div class="alert alert-info" role="alert">
+                    <small><strong>{{ stats.total_vpn_keys - stats.active_vpn_keys }}</strong> неактивных VPN ключей</small>
+                </div>
+                {% endif %}
+                
+                {% if stats.recent_registrations == 0 %}
+                <div class="alert alert-secondary" role="alert">
+                    <small>Нет новых регистраций за 24 часа</small>
+                </div>
+                {% endif %}
+                
+                <div class="text-center mt-3">
+                    <small class="text-muted">Всё под контролем 🛡️</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Info Card -->
+        <div class="card admin-card mt-3">
+            <div class="card-header bg-white">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Информация о системе
+                </h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <div class="mb-2">
+                        <strong>Версия:</strong> VPN Service v1.0.0
+                    </div>
+                    <div class="mb-2">
+                        <strong>Администратор:</strong> {{ current_admin }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Окружение:</strong> Production
+                    </div>
+                    <div>
+                        <strong>База данных:</strong> PostgreSQL
+                    </div>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update timestamp
+    document.getElementById('lastUpdate').textContent = adminUtils.formatDate(new Date());
+    
+    // Auto-refresh stats every 5 minutes
+    setInterval(() => {
+        location.reload();
+    }, 300000); // 5 minutes
+</script>
+{% endblock %} 

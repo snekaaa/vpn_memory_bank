@@ -1,0 +1,35 @@
+[Unit]
+Description=VPN Telegram Bot Production Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/vpn-bot
+ExecStart=/usr/bin/python3 /root/vpn-bot/production_start.py
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+
+# Environment variables
+Environment=PYTHONPATH=/root/vpn-bot
+Environment=PYTHONUNBUFFERED=1
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vpn-bot
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/root/vpn-bot
+
+[Install]
+WantedBy=multi-user.target 

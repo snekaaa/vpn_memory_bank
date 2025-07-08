@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Создать платеж</h2>
+        <p class="text-muted mb-0">Ручное создание платежа для пользователя</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/payments" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Назад к списку
+        </a>
+    </div>
+</div>
+
+{% if error %}
+    <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    </div>
+{% endif %}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Информация о платеже</h5>
+            </div>
+            <div class="card-body">
+                <form id="createPaymentForm" action="/admin/api/payments/create" method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="user_id" class="form-label">ID пользователя <span class="text-danger">*</span></label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="user_id" 
+                                       name="user_id" 
+                                       value="{% if user %}{{ user.id }}{% endif %}" 
+                                       required>
+                                <div class="form-text">Введите ID пользователя из базы данных</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="amount" class="form-label">Сумма <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="amount" 
+                                           name="amount" 
+                                           step="0.01" 
+                                           min="0" 
+                                           placeholder="0.00" 
+                                           required>
+                                    <span class="input-group-text">₽</span>
+                                </div>
+                                <div class="form-text">Введите 0 для триального платежа</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="payment_method" class="form-label">Метод платежа <span class="text-danger">*</span></label>
+                        <select class="form-select" id="payment_method" name="payment_method" required>
+                            <option value="">Выберите метод платежа</option>
+                            {% for method in payment_methods %}
+                                <option value="{{ method.value }}">{{ method.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Выберите подходящий метод для данного платежа</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Описание <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="description" 
+                                          name="description" 
+                                          rows="3" 
+                                          placeholder="Введите описание платежа" 
+                                          required></textarea>
+                                <div class="form-text">Подробное описание цели платежа</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="subscription_days" class="form-label">Дни подписки</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="subscription_days" 
+                                       name="subscription_days" 
+                                       min="1" 
+                                       max="3650" 
+                                       placeholder="30">
+                                <div class="form-text">Автоматически добавит дни к подписке</div>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>Создать платеж
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Сбросить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- User Info Card (if user provided) -->
+        {% if user %}
+        <div class="card admin-card mb-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Информация о пользователе</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">ID:</small>
+                    <div class="fw-bold">{{ user.id }}</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Telegram ID:</small>
+                    <div class="fw-bold">{{ user.telegram_id }}</div>
+                </div>
+                {% if user.username %}
+                <div class="mb-2">
+                    <small class="text-muted">Username:</small>
+                    <div class="fw-bold">@{{ user.username }}</div>
+                </div>
+                {% endif %}
+                {% if user.first_name %}
+                <div class="mb-2">
+                    <small class="text-muted">Имя:</small>
+                    <div class="fw-bold">{{ user.first_name }}</div>
+                </div>
+                {% endif %}
+                <div class="mb-2">
+                    <small class="text-muted">Статус подписки:</small>
+                    <span class="badge bg-{% if user.subscription_status.value == 'active' %}success{% else %}secondary{% endif %}">
+                        {{ user.subscription_status.value }}
+                    </span>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/admin/users/{{ user.id }}/" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-person-circle me-1"></i>Профиль пользователя
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions Card -->
+        <div class="card admin-card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Быстрые действия</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="fillTrialPayment()">
+                        <i class="bi bi-gift me-1"></i>Триальный платеж (0₽)
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="fillMonthlyPayment()">
+                        <i class="bi bi-calendar-month me-1"></i>Месячная подписка (100₽)
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="fillQuarterlyPayment()">
+                        <i class="bi bi-calendar3 me-1"></i>Квартальная подписка (300₽)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Card -->
+        <div class="card admin-card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Справка</h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <div class="mb-2">
+                        <strong>Методы платежей:</strong>
+                    </div>
+                    <ul class="list-unstyled mb-0">
+                        <li><span class="badge bg-secondary me-1">manual_admin</span> Ручной платеж администратором</li>
+                        <li><span class="badge bg-success me-1">manual_trial</span> Ручной триальный платеж</li>
+                        <li><span class="badge bg-warning me-1">manual_correction</span> Корректировка платежа</li>
+                    </ul>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+
+function fillTrialPayment() {
+    document.getElementById('amount').value = '0.00';
+    document.getElementById('payment_method').value = 'manual_trial';
+    document.getElementById('description').value = 'Триальный период - 3 дня';
+    document.getElementById('subscription_days').value = '3';
+}
+
+function fillMonthlyPayment() {
+    document.getElementById('amount').value = '100.00';
+    document.getElementById('payment_method').value = 'manual_admin';
+    document.getElementById('description').value = 'Месячная подписка VPN';
+    document.getElementById('subscription_days').value = '30';
+}
+
+function fillQuarterlyPayment() {
+    document.getElementById('amount').value = '300.00';
+    document.getElementById('payment_method').value = 'manual_admin';
+    document.getElementById('description').value = 'Квартальная подписка VPN';
+    document.getElementById('subscription_days').value = '90';
+}
+
+document.getElementById('createPaymentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const subscriptionDays = formData.get('subscription_days');
+    const data = {
+        user_id: parseInt(formData.get('user_id')),
+        amount: parseFloat(formData.get('amount')),
+        description: formData.get('description'),
+        payment_method: formData.get('payment_method'),
+        subscription_days: subscriptionDays ? parseInt(subscriptionDays) : null,
+        metadata: null
+    };
+    
+    try {
+        const response = await fetch('/admin/api/payments/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Показываем успешное сообщение и перенаправляем
+            alert('Платеж успешно создан!');
+            window.location.href = `/admin/payments/${result.payment_id}`;
+        } else {
+            alert('Ошибка: ' + (result.detail || result.message || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка при создании платежа: ' + error.message);
+    }
+});
+
+// Добавление метаданных по Enter
+document.getElementById('metadata_value').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addMetadata();
+    }
+});
+</script>
+
+{% endblock %} 

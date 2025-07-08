@@ -1,0 +1,37 @@
+# Production VPN Bot Dependencies
+# Core Telegram Bot Framework
+aiogram==3.4.1
+aiohttp==3.9.1
+
+# Configuration and Settings
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Logging and Monitoring
+structlog==23.2.0
+
+# HTTP Requests
+requests==2.31.0
+
+# Cryptography and VPN
+cryptography==41.0.7
+certifi==2024.2.2
+
+# Data Processing
+qrcode[pil]==7.4.2
+Pillow==10.1.0
+
+# System Monitoring
+psutil==5.9.6
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# JSON Processing
+ujson==5.8.0
+
+# Async Support
+asyncio-timeout==4.0.3
+
+# UUID Generation
+uuid==1.30 

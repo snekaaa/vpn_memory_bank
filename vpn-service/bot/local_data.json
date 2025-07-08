@@ -1,0 +1,840 @@
+{
+  "users": {
+    "352313872": {
+      "id": 352313872,
+      "telegram_id": 352313872,
+      "username": "av_nosov",
+      "first_name": "Andrey",
+      "email": null,
+      "phone": null,
+      "referral_code": "REF352313872",
+      "referred_by": null,
+      "is_premium": false,
+      "created_at": "2025-06-10T15:30:25.634421",
+      "notifications_enabled": true,
+      "notification_settings": {
+        "payment_success": true,
+        "payment_failed": true,
+        "subscription_expiring": true,
+        "subscription_expired": true,
+        "vpn_key_created": true,
+        "traffic_warnings": true
+      },
+      "last_name": "Nosov"
+    },
+    "1266460617": {
+      "id": 1266460617,
+      "telegram_id": 1266460617,
+      "username": "seo2seo",
+      "first_name": "Эмиль",
+      "email": null,
+      "phone": null,
+      "referral_code": "REF1266460617",
+      "referred_by": null,
+      "is_premium": false,
+      "created_at": "2025-06-11T10:52:04.570854",
+      "notifications_enabled": true,
+      "notification_settings": {
+        "payment_success": true,
+        "payment_failed": true,
+        "subscription_expiring": true,
+        "subscription_expired": true,
+        "vpn_key_created": true,
+        "traffic_warnings": true
+      }
+    }
+  },
+  "subscriptions": {
+    "1": {
+      "id": 1,
+      "telegram_id": 352313872,
+      "subscription_type": "monthly",
+      "status": "active",
+      "start_date": "2025-06-11T10:41:14.195986",
+      "end_date": "2025-07-11T10:41:14.195986",
+      "price": 299,
+      "is_active": true
+    },
+    "2": {
+      "id": 2,
+      "telegram_id": 1266460617,
+      "subscription_type": "trial",
+      "status": "active",
+      "start_date": "2025-06-11T10:52:04.572902",
+      "end_date": "2025-06-18T10:52:04.572902",
+      "price": 0,
+      "is_active": true
+    },
+    "3": {
+      "id": 3,
+      "telegram_id": 352313872,
+      "subscription_type": "quarterly",
+      "status": "active",
+      "start_date": "2025-06-12T12:49:22.080187",
+      "end_date": "2025-09-10T12:49:22.080187",
+      "price": 799,
+      "is_active": true
+    },
+    "4": {
+      "id": 4,
+      "telegram_id": 352313872,
+      "subscription_type": "yearly",
+      "status": "active",
+      "start_date": "2025-06-12T12:54:07.773885",
+      "end_date": "2026-06-12T12:54:07.773885",
+      "price": 2999,
+      "is_active": true
+    }
+  },
+  "payments": {
+    "1": {
+      "id": 1,
+      "telegram_id": 352313872,
+      "subscription_id": 1,
+      "amount": 299,
+      "currency": "RUB",
+      "status": "completed",
+      "payment_method": "банковская_карта",
+      "description": "Подписка monthly",
+      "created_at": "2025-06-11T10:41:14.197401"
+    },
+    "2": {
+      "id": 2,
+      "telegram_id": 352313872,
+      "subscription_id": 3,
+      "amount": 799,
+      "currency": "RUB",
+      "status": "completed",
+      "payment_method": "банковская_карта",
+      "description": "Подписка quarterly",
+      "created_at": "2025-06-12T12:49:22.084736"
+    },
+    "3": {
+      "id": 3,
+      "telegram_id": 352313872,
+      "subscription_id": 4,
+      "amount": 2999,
+      "currency": "RUB",
+      "status": "completed",
+      "payment_method": "банковская_карта",
+      "description": "Подписка yearly",
+      "created_at": "2025-06-12T12:54:07.776385"
+    }
+  },
+  "vpn_keys": {
+    "68886": {
+      "id": 68886,
+      "name": "VPN-68886",
+      "telegram_id": 352313872,
+      "uuid": "c7d9aefb-f174-408b-8a6a-ca12493bdaeb",
+      "server": {
+        "name": "Bezlagov-Main",
+        "address": "bezlagov.ru",
+        "port": 443,
+        "location": "Russia",
+        "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+        "short_id": "a5e8c7d9",
+        "security": "tls"
+      },
+      "vless_url": "vless://654ba752-2ce0-429a-be26-8a0de9448316@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#tg_352313872_monthly",
+      "sing_box_config": {
+        "log": {
+          "level": "info"
+        },
+        "inbounds": [
+          {
+            "type": "tun",
+            "tag": "tun-in",
+            "interface_name": "tun0",
+            "inet4_address": "172.19.0.1/30",
+            "auto_route": true,
+            "strict_route": true,
+            "sniff": true
+          }
+        ],
+        "outbounds": [
+          {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "bezlagov.ru",
+            "server_port": 443,
+            "uuid": "3f911ca3-bdc5-4ae0-9ee3-efb6fea104d6",
+            "flow": "xtls-rprx-vision",
+            "tls": {
+              "enabled": true,
+              "server_name": "www.cloudflare.com",
+              "reality": {
+                "enabled": true,
+                "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "short_id": "a5e8c7d9"
+              }
+            }
+          },
+          {
+            "type": "direct",
+            "tag": "direct"
+          }
+        ],
+        "route": {
+          "rules": [
+            {
+              "inbound": "tun-in",
+              "outbound": "proxy"
+            }
+          ]
+        }
+      },
+      "v2ray_config": {
+        "log": {
+          "loglevel": "info"
+        },
+        "inbounds": [
+          {
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "bezlagov.ru",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "3f911ca3-bdc5-4ae0-9ee3-efb6fea104d6",
+                      "flow": "xtls-rprx-vision",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "reality",
+              "realitySettings": {
+                "serverName": "www.cloudflare.com",
+                "fingerprint": "chrome",
+                "publicKey": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "shortId": "a5e8c7d9"
+              }
+            }
+          }
+        ]
+      },
+      "qr_code": "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",
+      "subscription_type": "monthly",
+      "traffic_limit_bytes": 107374182400,
+      "traffic_used_bytes": 0,
+      "is_active": false,
+      "created_at": "2024-01-15T10:00:00Z",
+      "subscription_id": 1,
+      "xui_created": true,
+      "xui_pending": false,
+      "xui_uuid": "654ba752-2ce0-429a-be26-8a0de9448316",
+      "xui_email": "tg_352313872_monthly",
+      "xui_port": 443,
+      "xui_network": "tcp",
+      "xui_security": "tls",
+      "xui_stream_settings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "bezlagov.ru",
+          "certificates": [
+            {
+              "certificateFile": "/etc/letsencrypt/live/bezlagov.ru/fullchain.pem",
+              "keyFile": "/etc/letsencrypt/live/bezlagov.ru/privkey.pem"
+            }
+          ]
+        }
+      },
+      "updated_at": "2025-06-12T13:23:04.240399"
+    },
+    "719283": {
+      "id": 719283,
+      "name": "VPN-719283",
+      "telegram_id": 1266460617,
+      "uuid": "4cb96155-6e6a-4b86-b063-aad54d2e0086",
+      "server": {
+        "name": "Bezlagov-Main",
+        "address": "bezlagov.ru",
+        "port": 443,
+        "location": "Russia",
+        "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+        "short_id": "a5e8c7d9",
+        "security": "tls"
+      },
+      "vless_url": "vless://4cb96155-6e6a-4b86-b063-aad54d2e0086@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#tg_1266460617_trial",
+      "sing_box_config": {
+        "log": {
+          "level": "info"
+        },
+        "inbounds": [
+          {
+            "type": "tun",
+            "tag": "tun-in",
+            "interface_name": "tun0",
+            "inet4_address": "172.19.0.1/30",
+            "auto_route": true,
+            "strict_route": true,
+            "sniff": true
+          }
+        ],
+        "outbounds": [
+          {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "bezlagov.ru",
+            "server_port": 443,
+            "uuid": "1cd1587c-004c-4353-81c9-412fdc86ec50",
+            "flow": "xtls-rprx-vision",
+            "tls": {
+              "enabled": true,
+              "server_name": "www.cloudflare.com",
+              "reality": {
+                "enabled": true,
+                "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "short_id": "a5e8c7d9"
+              }
+            }
+          },
+          {
+            "type": "direct",
+            "tag": "direct"
+          }
+        ],
+        "route": {
+          "rules": [
+            {
+              "inbound": "tun-in",
+              "outbound": "proxy"
+            }
+          ]
+        }
+      },
+      "v2ray_config": {
+        "log": {
+          "loglevel": "info"
+        },
+        "inbounds": [
+          {
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "bezlagov.ru",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "1cd1587c-004c-4353-81c9-412fdc86ec50",
+                      "flow": "xtls-rprx-vision",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "reality",
+              "realitySettings": {
+                "serverName": "www.cloudflare.com",
+                "fingerprint": "chrome",
+                "publicKey": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "shortId": "a5e8c7d9"
+              }
+            }
+          }
+        ]
+      },
+      "qr_code": "iVBORw0KGgoAAAANSUhEUgAAAooAAAKKAQAAAACSD0chAAAGf0lEQVR4nO2dXWrsSAyFj8YNeXRDFpCluHcwa7pLmh3YS8kCBsqPF9xoHqr0U86F4U6SoZs69eD0j/3hhghJR1JZFF+8tj++mggQSSSRRBJJJJFEEkkkkUR+FiltXQDsF9RX2xXAJiIiVwDYRQDcBdv1LnLb2zWAvZLb994lkUQ+FvJS/ywrAOyvEACCZb0LMLdzqrCw/akQYFJZ3l/UPr5fAEwHAEC+7S6JJPIRkVBVVSwFwFImVdUDqgV20KOduOhRD6plaldUQJkUwKRYVFXX5/jhRBL55Ui5YVKRt8Mit+uk1azW/UX1h7yo3HAX/fGmmmzr/71LIol8BOTl9F6xvx6K/UVlUQDLu0C3KwTABCx6F2xvCmC//MJyvukuiSTykZGzqq4A5DYfwHa9N4UAs9awTLUAIldA1/2CGrlt8lKTouyFnuuHE0nkf18172mrRWm/e7DLmfcQORSyRm7RrqPb2wFsbweA+ahBm2IHFDv8swnYrhOA+adovvyb7pJIIh8RmX1PFd70gK4WrzWlrQCo4ZuaWWlBPU/X+UA9KH0PkSMhTbE2ORpLQVas19l06jU0aUuSzJiUijWRIyLNYcxdHccdkFmPmjhg2U67LDIlpe8hcjSkW4+6BTR30uqmHqr1p7Qa6XxA1wpyi3qOH04kkZ9eVTWQ5f1y6CaTCuZS/YxgLvZ2f1FgF+h2LSrApADuosAdwPz3RStl/aa7JJLIR0S6atB7klk1deosBemLlB9VdcGDO+Y9RA6FTJqbZTGwwg3Qet9WE9laylOAZjOnjjdaD5EjIT9obnARWs1SmiYN5C7RZj2AaW5gtZTIwZDeY23iWf4MyQt1IoJ/VszjxKL1EDkK0v75S/SqtXmDqlhHlJZUtbmJ1aHIWUJE6yFyIGSnGsBrpFVEyIM/VjIF4BJDakJgrwGR4yHd9zRz0ZiOW82dmHdxB3Sqqrq3ovUQORTSfI8paNHilmKzlvxMmmuksyc6iKyI1kPkQMiz74H3hrYmneL9a0CS5eq10QVX9WxaD5EjIVPeYyFYa2ezttCsCyQV28fhkqhN30PkUMjke1IcVg+phyArBHZl152QOkef44cTSeTnl2UvvpNOJ61VEwo5YQUsPwK8oGrpEiM3IodC5mpp8yS51JPzGQCREHXzPXag9RA5FDLN99hy/bkA0X+Qvm0Not6zAzByI3JEZN/nphp9bsh2FAGauycA+TKAqgGRgyHtXx7R5+amEXOkVh7VNDtXvBrE2VIix0Qm1SD6CtLOBe6FUqE07d02RzsCVQMiR0OmLtG2LHJrHidJcCYieFdOzopY7yFyOGTve8zPrN4Hemo9cO06x2sW8NH3EDkWMu0Kkqd1CtLoWw7a0giQD9B1sgOth8hhkN1uiGFH/mqtX0SBx+K6NWqpyI0JtB4ih0F21VLk7UHTtxHN+V6J4YqsK5uKNZGjIbtdQeY8j92+LcgBWpx32l0nNco9xw8nksjPr/A9ed+PLlRLu+a4nNAsJXoSLN6j9RA5DDL1GuQpA1fQwvd4otNtsRNpEJj3EDkYsp8tBWLiOjWNatdU3U36TLm3h9ZD5FDID7OleYzHHgK8AjbpE2NzpZvv4b4GRI6H/DDfswLotjnwh48UFwzCrGbNhVJaD5FDIc/zPandMz8qob3N242mek+McdN6iBwI2UVuAEJQa5t/zCYdrIDPlgLw4M4afFjvIXI0ZJaeW70n9jY8kiKXlIQkGABp3IfWQ+RYyE6xRhgEYL4ntps6PX7R857ZzYrWQ+RIyK4Xx1TnmIlT76e2zRHbyppbVaw530PkaMhzr0Fq10nCG/IBoU63EaBu0XqIHAV57rHOQ6J9MSf3H/g+1iWeBMy8h8jRkN3jd8IqfPa6mUucHPsadJbHvIfI8ZDnh1eFOKBeQc1bg8SUKTwr6pwXrYfIYZCd/8CUJhSyvmatObFDYsjb3FOHyFGRrlirphkdjbfdoct7ppQkBYrWQ+QwyO4ZpcU7B2bVCN+6p2J783XUewATumk9RI6E/GA96ZG+Vuo5BWihGiRXxB5rIsdDXs4fLH8JsJTXA9ttUsH8U4D5p+h2hSj2VxXsl0MwHxfdBMCyHlDsr994l0QS+YjIc94ThdIkqLXMJjxT3sDNxoLoe4gcDflRc+vMJSU6qkeK5vKztcFnxxE5JFL038/5vbU9xw8nkkgiiSSSSCKJJJJIIodB/gO92DFE5wH0ZAAAAABJRU5ErkJggg==",
+      "subscription_type": "trial",
+      "traffic_limit_bytes": 10737418240,
+      "traffic_used_bytes": 0,
+      "is_active": true,
+      "created_at": "2024-01-15T10:00:00Z",
+      "subscription_id": 2,
+      "xui_created": true,
+      "xui_pending": false,
+      "xui_uuid": "4cb96155-6e6a-4b86-b063-aad54d2e0086",
+      "xui_email": "tg_1266460617_trial",
+      "xui_port": 443,
+      "xui_network": "tcp",
+      "xui_security": "tls",
+      "xui_stream_settings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "bezlagov.ru",
+          "certificates": [
+            {
+              "certificateFile": "/etc/letsencrypt/live/bezlagov.ru/fullchain.pem",
+              "keyFile": "/etc/letsencrypt/live/bezlagov.ru/privkey.pem"
+            }
+          ]
+        }
+      }
+    },
+    "542692": {
+      "id": 542692,
+      "name": "VPN-542692",
+      "telegram_id": 352313872,
+      "uuid": "f87c96b1-ec3e-4819-a93e-13c196f1433e",
+      "server": {
+        "name": "Bezlagov-Main",
+        "address": "bezlagov.ru",
+        "port": 443,
+        "location": "Russia",
+        "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+        "short_id": "a5e8c7d9",
+        "security": "tls"
+      },
+      "vless_url": "vless://f87c96b1-ec3e-4819-a93e-13c196f1433e@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#tg_352313872_quarterly",
+      "sing_box_config": {
+        "log": {
+          "level": "info"
+        },
+        "inbounds": [
+          {
+            "type": "tun",
+            "tag": "tun-in",
+            "interface_name": "tun0",
+            "inet4_address": "172.19.0.1/30",
+            "auto_route": true,
+            "strict_route": true,
+            "sniff": true
+          }
+        ],
+        "outbounds": [
+          {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "bezlagov.ru",
+            "server_port": 443,
+            "uuid": "7d9b8a08-9054-498e-87d8-7ca5a045e262",
+            "flow": "xtls-rprx-vision",
+            "tls": {
+              "enabled": true,
+              "server_name": "www.cloudflare.com",
+              "reality": {
+                "enabled": true,
+                "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "short_id": "a5e8c7d9"
+              }
+            }
+          },
+          {
+            "type": "direct",
+            "tag": "direct"
+          }
+        ],
+        "route": {
+          "rules": [
+            {
+              "inbound": "tun-in",
+              "outbound": "proxy"
+            }
+          ]
+        }
+      },
+      "v2ray_config": {
+        "log": {
+          "loglevel": "info"
+        },
+        "inbounds": [
+          {
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "bezlagov.ru",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "7d9b8a08-9054-498e-87d8-7ca5a045e262",
+                      "flow": "xtls-rprx-vision",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "reality",
+              "realitySettings": {
+                "serverName": "www.cloudflare.com",
+                "fingerprint": "chrome",
+                "publicKey": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "shortId": "a5e8c7d9"
+              }
+            }
+          }
+        ]
+      },
+      "qr_code": "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",
+      "subscription_type": "quarterly",
+      "traffic_limit_bytes": 322122547200,
+      "traffic_used_bytes": 0,
+      "is_active": false,
+      "created_at": "2024-01-15T10:00:00Z",
+      "subscription_id": 3,
+      "xui_created": true,
+      "xui_pending": false,
+      "xui_uuid": "f87c96b1-ec3e-4819-a93e-13c196f1433e",
+      "xui_email": "tg_352313872_quarterly",
+      "xui_port": 443,
+      "xui_network": "tcp",
+      "xui_security": "tls",
+      "xui_stream_settings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "bezlagov.ru",
+          "certificates": [
+            {
+              "certificateFile": "/etc/letsencrypt/live/bezlagov.ru/fullchain.pem",
+              "keyFile": "/etc/letsencrypt/live/bezlagov.ru/privkey.pem"
+            }
+          ]
+        }
+      },
+      "updated_at": "2025-06-12T13:23:22.936803"
+    },
+    "507247": {
+      "id": 507247,
+      "name": "VPN-507247",
+      "telegram_id": 352313872,
+      "uuid": "666850f0-5611-427e-9403-41684c2bdaaf",
+      "server": {
+        "name": "Bezlagov-Main",
+        "address": "bezlagov.ru",
+        "port": 443,
+        "location": "Russia",
+        "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+        "short_id": "a5e8c7d9",
+        "security": "tls"
+      },
+      "vless_url": "vless://666850f0-5611-427e-9403-41684c2bdaaf@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_yearly",
+      "sing_box_config": {
+        "log": {
+          "level": "info"
+        },
+        "inbounds": [
+          {
+            "type": "tun",
+            "tag": "tun-in",
+            "interface_name": "tun0",
+            "inet4_address": "172.19.0.1/30",
+            "auto_route": true,
+            "strict_route": true,
+            "sniff": true
+          }
+        ],
+        "outbounds": [
+          {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "bezlagov.ru",
+            "server_port": 443,
+            "uuid": "9b2f3775-9b51-484c-9124-1e92d14eb833",
+            "flow": "xtls-rprx-vision",
+            "tls": {
+              "enabled": true,
+              "server_name": "www.cloudflare.com",
+              "reality": {
+                "enabled": true,
+                "public_key": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "short_id": "a5e8c7d9"
+              }
+            }
+          },
+          {
+            "type": "direct",
+            "tag": "direct"
+          }
+        ],
+        "route": {
+          "rules": [
+            {
+              "inbound": "tun-in",
+              "outbound": "proxy"
+            }
+          ]
+        }
+      },
+      "v2ray_config": {
+        "log": {
+          "loglevel": "info"
+        },
+        "inbounds": [
+          {
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "bezlagov.ru",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "9b2f3775-9b51-484c-9124-1e92d14eb833",
+                      "flow": "xtls-rprx-vision",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "reality",
+              "realitySettings": {
+                "serverName": "www.cloudflare.com",
+                "fingerprint": "chrome",
+                "publicKey": "cCnC7VZJyeYr7x6Kz5pvOhRyXyeFEPR8UVE95FKDjGM",
+                "shortId": "a5e8c7d9"
+              }
+            }
+          }
+        ]
+      },
+      "qr_code": "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",
+      "subscription_type": "yearly",
+      "traffic_limit_bytes": 1288490188800,
+      "traffic_used_bytes": 0,
+      "is_active": false,
+      "created_at": "2024-01-15T10:00:00Z",
+      "subscription_id": 4,
+      "xui_created": true,
+      "xui_pending": false,
+      "xui_uuid": "666850f0-5611-427e-9403-41684c2bdaaf",
+      "xui_email": "352313872 (@av_nosov)_yearly",
+      "xui_port": 443,
+      "xui_network": "tcp",
+      "xui_security": "tls",
+      "xui_stream_settings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "bezlagov.ru",
+          "certificates": [
+            {
+              "certificateFile": "/etc/letsencrypt/live/bezlagov.ru/fullchain.pem",
+              "keyFile": "/etc/letsencrypt/live/bezlagov.ru/privkey.pem"
+            }
+          ]
+        }
+      },
+      "updated_at": "2025-06-12T13:23:27.466942"
+    },
+    "5": {
+      "id": 5,
+      "telegram_id": 352313872,
+      "uuid": "e2571920-07b4-4d43-8de6-05695ef6c5bb",
+      "vless_url": "vless://e2571920-07b4-4d43-8de6-05695ef6c5bb@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:23:04.712153"
+    },
+    "6": {
+      "id": 6,
+      "telegram_id": 352313872,
+      "uuid": "19a8cc2f-4838-4abe-a163-7df82bdb0fa7",
+      "vless_url": "vless://19a8cc2f-4838-4abe-a163-7df82bdb0fa7@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:23:23.419206"
+    },
+    "7": {
+      "id": 7,
+      "telegram_id": 352313872,
+      "uuid": "f2c142d5-e088-41de-8b4d-76fd5551c007",
+      "vless_url": "vless://f2c142d5-e088-41de-8b4d-76fd5551c007@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:23:27.936783"
+    },
+    "8": {
+      "id": 8,
+      "telegram_id": 352313872,
+      "uuid": "5a712abe-4b8c-447e-a2aa-807833562671",
+      "vless_url": "vless://5a712abe-4b8c-447e-a2aa-807833562671@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:23:45.129498"
+    },
+    "9": {
+      "id": 9,
+      "telegram_id": 352313872,
+      "uuid": "940808e0-0a13-40f5-a020-54251413d7c3",
+      "vless_url": "vless://940808e0-0a13-40f5-a020-54251413d7c3@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:29:59.504865"
+    },
+    "10": {
+      "id": 10,
+      "telegram_id": 352313872,
+      "uuid": "7a9dd2e8-4c91-4017-a6ab-66315796510f",
+      "vless_url": "vless://7a9dd2e8-4c91-4017-a6ab-66315796510f@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:30:03.215234"
+    },
+    "11": {
+      "id": 11,
+      "telegram_id": 352313872,
+      "uuid": "dd15538f-0d4f-43b7-8aba-e4de4c8c5ccd",
+      "vless_url": "vless://dd15538f-0d4f-43b7-8aba-e4de4c8c5ccd@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)_автоматический",
+      "xui_email": "352313872 (@av_nosov)_автоматический_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "автоматический",
+      "created_at": "2025-06-12T13:43:26.451331"
+    },
+    "12": {
+      "id": 12,
+      "telegram_id": 352313872,
+      "uuid": "b038a783-4b65-40e3-90c8-78189b7f4190",
+      "vless_url": "vless://b038a783-4b65-40e3-90c8-78189b7f4190@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)",
+      "xui_email": "352313872 (@av_nosov)_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "auto",
+      "created_at": "2025-06-12T14:03:16.579307"
+    },
+    "13": {
+      "id": 13,
+      "telegram_id": 352313872,
+      "uuid": "df4fb7c0-7a87-4822-b1e2-989abe5b60d3",
+      "vless_url": "vless://df4fb7c0-7a87-4822-b1e2-989abe5b60d3@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872 (@av_nosov)",
+      "xui_email": "352313872 (@av_nosov)_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "auto",
+      "created_at": "2025-06-12T14:03:20.702905"
+    },
+    "14": {
+      "id": 14,
+      "telegram_id": 352313872,
+      "uuid": "64440b5e-766f-4f51-8907-550d4492f06c",
+      "vless_url": "vless://64440b5e-766f-4f51-8907-550d4492f06c@bezlagov.ru:443?type=tcp&security=tls&sni=bezlagov.ru&fp=chrome&alpn=h2%2Chttp/1.1#352313872(@av_nosov)",
+      "xui_email": "352313872(@av_nosov)",
+      "xui_inbound_id": 9,
+      "is_active": false,
+      "xui_created": true,
+      "subscription_type": "auto",
+      "created_at": "2025-06-12T14:07:37.893507",
+      "updated_at": "2025-06-12T14:08:04.529480"
+    },
+    "15": {
+      "id": 15,
+      "telegram_id": 352313872,
+      "uuid": "ccc55716-58e6-4b6a-b418-d29f137e2aec",
+      "vless_url": "vless://ccc55716-58e6-4b6a-b418-d29f137e2aec@bezlagov.ru:443?type=tcp&security=tls&fp=chrome&alpn=h3%2Ch2%2Chttp%2F1.1&sni=bezlagov.ru#352313872(@av_nosov)",
+      "xui_email": "352313872(@av_nosov)_mock",
+      "xui_inbound_id": 1,
+      "is_active": false,
+      "xui_created": false,
+      "subscription_type": "auto",
+      "created_at": "2025-06-12T14:08:04.699986"
+    },
+    "16": {
+      "id": 16,
+      "telegram_id": 352313872,
+      "uuid": "ee2f94c3-ab8c-4938-85c7-4e3b01563d9e",
+      "vless_url": "vless://ee2f94c3-ab8c-4938-85c7-4e3b01563d9e@bezlagov.ru:443?type=tcp&security=tls&sni=bezlagov.ru&fp=chrome&alpn=h2%2Chttp/1.1#352313872(@av_nosov)",
+      "xui_email": "352313872(@av_nosov)",
+      "xui_inbound_id": 9,
+      "is_active": false,
+      "xui_created": true,
+      "subscription_type": "auto",
+      "created_at": "2025-06-12T14:13:29.205106",
+      "updated_at": "2025-06-24T09:21:42.345544"
+    },
+    "17": {
+      "id": 17,
+      "telegram_id": 352313872,
+      "uuid": "7ff53471-18b6-401b-8bb4-c342c7cc9745",
+      "vless_url": "vless://7ff53471-18b6-401b-8bb4-c342c7cc9745@bezlagov.ru:443?type=tcp&security=tls&sni=bezlagov.ru&fp=chrome&alpn=h2%2Chttp/1.1#352313872(@av_nosov)",
+      "xui_email": "352313872(@av_nosov)",
+      "xui_inbound_id": 9,
+      "is_active": false,
+      "xui_created": true,
+      "subscription_type": "auto",
+      "created_at": "2025-06-24T09:21:43.246461",
+      "updated_at": "2025-06-24T09:26:14.214570"
+    },
+    "18": {
+      "id": 18,
+      "telegram_id": 352313872,
+      "uuid": "239ddfb3-ef58-4ab7-a41b-c149f4ad135a",
+      "vless_url": "vless://239ddfb3-ef58-4ab7-a41b-c149f4ad135a@bezlagov.ru:443?type=tcp&security=tls&sni=bezlagov.ru&fp=chrome&alpn=h2%2Chttp/1.1#352313872(@av_nosov)",
+      "xui_email": "352313872(@av_nosov)",
+      "xui_inbound_id": 9,
+      "is_active": true,
+      "xui_created": true,
+      "subscription_type": "auto",
+      "created_at": "2025-06-24T09:26:14.975400"
+    }
+  }
+}

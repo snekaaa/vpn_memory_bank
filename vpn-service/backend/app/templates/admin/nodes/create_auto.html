@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Автоматическое развертывание VPN Ноды | VPN Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-robot"></i> Автоматическое развертывание VPN Ноды</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/admin/nodes" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Назад к списку
+            </a>
+            <a href="/admin/nodes/create" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-gear"></i> Ручное создание
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Automated Deployment Form -->
+<div class="card admin-card">
+    <div class="card-header">
+        <h5><i class="bi bi-robot me-2"></i>SSH автоматизация (Reality Mode)</h5>
+        <small class="text-muted">Полностью автоматическая установка VPN ноды через SSH. Режим Reality - без доменов и сертификатов.</small>
+    </div>
+    <div class="card-body">
+        <form id="automatedNodeForm">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="ssh_host" class="form-label">IP адрес сервера *</label>
+                                <input type="text" class="form-control" id="ssh_host" name="ssh_host" required 
+                                       placeholder="91.84.101.70">
+                                <div class="form-text">IP адрес VPS сервера</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="ssh_user" class="form-label">Логин *</label>
+                                <input type="text" class="form-control" id="ssh_user" name="ssh_user" value="root" required>
+                                <div class="form-text">SSH пользователь</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="ssh_password" class="form-label">Пароль *</label>
+                                <input type="password" class="form-control" id="ssh_password" name="ssh_password" required>
+                                <div class="form-text">SSH пароль</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Optional Settings (Collapsed) -->
+                    <div class="mb-3">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSettings" aria-expanded="false">
+                            <i class="bi bi-gear"></i> Дополнительные настройки (опционально)
+                        </button>
+                    </div>
+                    
+                    <div class="collapse" id="advancedSettings">
+                        <div class="card card-body bg-light">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="auto_name" class="form-label">Название ноды</label>
+                                        <input type="text" class="form-control" id="auto_name" name="name" placeholder="Авто-генерация">
+                                        <div class="form-text">Оставьте пустым для автоматической генерации</div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="auto_location" class="form-label">Локация</label>
+                                        <input type="text" class="form-control" id="auto_location" name="location" placeholder="Авто-определение">
+                                        <div class="form-text">Географическое расположение</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="auto_custom_port" class="form-label">Порт VPN</label>
+                                        <input type="number" class="form-control" id="auto_custom_port" name="custom_port" value="443" min="1" max="65535">
+                                        <div class="form-text">Порт для VPN соединений</div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="sni_mask" class="form-label">SNI маскировка</label>
+                                        <input type="text" class="form-control" id="sni_mask" name="sni_mask" value="apple.com">
+                                        <div class="form-text">Домен для маскировки трафика</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="auto_add_to_balancer" name="auto_add_to_balancer" checked>
+                                    <label class="form-check-label" for="auto_add_to_balancer">
+                                        Автоматически добавить в балансировщик
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card bg-info bg-opacity-10 border-info">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-info-circle"></i> Reality Mode</h6>
+                            <ul class="list-unstyled small">
+                                <li>✅ Без доменов и SSL</li>
+                                <li>✅ Прямое подключение по IP</li>
+                                <li>✅ Маскировка трафика</li>
+                                <li>✅ Быстрая установка ~5-10 мин</li>
+                                <li>✅ Устойчивость к блокировкам</li>
+                            </ul>
+                            
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <strong>Что происходит:</strong><br>
+                                    1. Подключение по SSH<br>
+                                    2. Установка Xray<br>
+                                    3. Генерация ключей Reality<br>
+                                    4. Настройка X3UI панели<br>
+                                    5. Тестирование соединения
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div>
+                    <button type="button" class="btn btn-success btn-lg" id="startDeployment">
+                        <i class="bi bi-play-circle"></i> Запустить автоматическое развертывание
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" id="validateConfig">
+                        <i class="bi bi-check-circle"></i> Проверить подключение
+                    </button>
+                </div>
+                <div class="text-muted">
+                    <small><i class="bi bi-clock"></i> Ожидаемое время: 5-10 минут</small>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal fade" id="deploymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-gear-fill"></i> Развертывание VPN ноды
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Прогресс установки</span>
+                        <span id="progressPercentage">0%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" id="progressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Текущий этап:</strong>
+                    <span id="currentStep">Подготовка...</span>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <small>Лог выполнения</small>
+                    </div>
+                    <div class="card-body p-2" style="max-height: 300px; overflow-y: auto;">
+                        <pre id="deploymentLogs" class="mb-0 small"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="closeModal" data-bs-dismiss="modal" disabled>
+                    Закрыть
+                </button>
+                <button type="button" class="btn btn-success" id="viewNode" style="display: none;">
+                    <i class="bi bi-eye"></i> Перейти к ноде
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let deploymentId = null;
+let progressInterval = null;
+
+document.getElementById('startDeployment').addEventListener('click', function() {
+    const form = document.getElementById('automatedNodeForm');
+    const formData = new FormData(form);
+    
+    // Проверяем обязательные поля
+    const requiredFields = ['ssh_host', 'ssh_user', 'ssh_password'];
+    for (let field of requiredFields) {
+        if (!formData.get(field)) {
+            alert(`Поле "${field}" обязательно для заполнения`);
+            return;
+        }
+    }
+    
+    // Запускаем развертывание
+    startDeployment(formData);
+});
+
+document.getElementById('validateConfig').addEventListener('click', function() {
+    const form = document.getElementById('automatedNodeForm');
+    const formData = new FormData(form);
+    
+    fetch('/admin/nodes/api/validate-deployment-config', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Подключение успешно! Сервер готов к развертыванию.');
+        } else {
+            alert('❌ Ошибка подключения: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('❌ Ошибка проверки: ' + error.message);
+    });
+});
+
+function startDeployment(formData) {
+    fetch('/admin/nodes/api/auto-deploy', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            deploymentId = data.deployment_id;
+            showProgressModal();
+            startProgressTracking();
+        } else {
+            alert('Ошибка запуска развертывания: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Ошибка: ' + error.message);
+    });
+}
+
+function showProgressModal() {
+    const modal = new bootstrap.Modal(document.getElementById('deploymentModal'));
+    modal.show();
+}
+
+function startProgressTracking() {
+    progressInterval = setInterval(updateProgress, 2000);
+}
+
+function updateProgress() {
+    if (!deploymentId) return;
+    
+    fetch(`/admin/nodes/api/deployment-progress/${deploymentId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const progress = data.progress;
+            
+            // Обновляем прогресс-бар
+            document.getElementById('progressBar').style.width = progress.percentage + '%';
+            document.getElementById('progressPercentage').textContent = progress.percentage + '%';
+            document.getElementById('currentStep').textContent = progress.current_step;
+            
+            // Обновляем логи
+            if (progress.logs) {
+                document.getElementById('deploymentLogs').textContent = progress.logs.join('\n');
+                const logsContainer = document.getElementById('deploymentLogs').parentElement;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            
+            // Проверяем завершение
+            if (progress.status === 'COMPLETED') {
+                clearInterval(progressInterval);
+                document.getElementById('closeModal').disabled = false;
+                document.getElementById('viewNode').style.display = 'inline-block';
+                document.getElementById('viewNode').onclick = () => {
+                    // Проверяем, что node_id существует и не null, иначе перенаправляем на список нод
+                    if (progress.node_id && progress.node_id !== null) {
+                        window.location.href = `/admin/nodes/${progress.node_id}`;
+                    } else {
+                        // Если node_id не определен, перенаправляем на список всех нод
+                        window.location.href = '/admin/nodes';
+                    }
+                };
+                
+                // Успешное завершение
+                document.getElementById('progressBar').classList.remove('progress-bar-animated');
+                document.getElementById('progressBar').classList.add('bg-success');
+                
+            } else if (progress.status === 'FAILED') {
+                clearInterval(progressInterval);
+                document.getElementById('closeModal').disabled = false;
+                
+                // Ошибка
+                document.getElementById('progressBar').classList.remove('progress-bar-animated');
+                document.getElementById('progressBar').classList.add('bg-danger');
+                document.getElementById('currentStep').innerHTML = '<span class="text-danger">❌ Ошибка развертывания</span>';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка получения прогресса:', error);
+    });
+}
+
+// Очистка интервала при закрытии модала
+document.getElementById('deploymentModal').addEventListener('hidden.bs.modal', function() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+});
+</script>
+
+<style>
+.deployment-method-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.deployment-method-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.deployment-method-card.selected {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.admin-card {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: none;
+}
+</style>
+{% endblock %} 
