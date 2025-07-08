@@ -19,7 +19,7 @@ from keyboards.main_menu import (
     get_existing_payment_keyboard
 )
 from services.plans_api_client import plans_api_client
-from api_client import api_client
+# from api_client import api_client  # Отключен - используем локальный SimpleAPIClient
 import aiohttp
 import structlog
 
@@ -89,7 +89,7 @@ async def show_subscription_plans(message: Message, state: FSMContext):
         telegram_id = message.from_user.id
         
         # Сначала проверяем есть ли у пользователя неоплаченные платежи
-        pending_payments_response = await api_client.get_user_pending_payments(telegram_id)
+        pending_payments_response = await SimpleAPIClient().get_user_pending_payments(telegram_id)
         
         if pending_payments_response and pending_payments_response.get('pending_payments'):
             # Есть неоплаченные платежи - показываем их
@@ -540,7 +540,7 @@ async def cancel_payment(callback: CallbackQuery, state: FSMContext):
         telegram_id = callback.from_user.id
         
         # Отменяем все неоплаченные платежи пользователя
-        cancel_result = await api_client.cancel_user_pending_payments(telegram_id)
+        cancel_result = await SimpleAPIClient().cancel_user_pending_payments(telegram_id)
         
         if cancel_result and cancel_result.get('status') == 'success':
             logger.info(f"Successfully cancelled pending payments for user {telegram_id}")
@@ -645,6 +645,14 @@ class SimpleAPIClient:
     async def get_payment_status(self, payment_id: int) -> Dict:
         """Получение статуса платежа"""
         return await self._make_request("GET", f"/api/v1/payments/{payment_id}") 
+    
+    async def get_user_pending_payments(self, telegram_id: int) -> Dict:
+        """Получение неоплаченных платежей пользователя"""
+        return await self._make_request("GET", f"/api/v1/payments/user/{telegram_id}/pending")
+    
+    async def cancel_user_pending_payments(self, telegram_id: int) -> Dict:
+        """Отмена всех неоплаченных платежей пользователя"""
+        return await self._make_request("POST", f"/api/v1/payments/user/{telegram_id}/cancel_all")
     
     async def get_active_payment_providers(self) -> Dict:
         """Получение списка активных провайдеров"""

@@ -158,67 +158,65 @@ class PaymentManagementService:
             ValueError: При некорректных данных
             Exception: При ошибках обновления
         """
-        async with self.db.begin():
-            try:
-                # Получаем платеж
-                payment = await self._get_payment_or_raise(payment_id)
-                old_status = payment.status
+        try:
+            # Получаем платеж
+            payment = await self._get_payment_or_raise(payment_id)
+            old_status = payment.status
+            
+            # Валидация изменения статуса
+            await self._validate_payment_status_change(payment, new_status)
+            
+            # Обновляем статус
+            payment.status = new_status
+            payment.updated_at = datetime.now(timezone.utc)
+            
+            # Если статус изменился на SUCCEEDED, продлеваем подписку
+            extended_user = None
+            if (new_status == PaymentStatus.SUCCEEDED and 
+                old_status != PaymentStatus.SUCCEEDED):
                 
-                # Валидация изменения статуса
-                await self._validate_payment_status_change(payment, new_status)
+                extended_user = await self._extend_user_subscription(payment)
                 
-                # Обновляем статус
-                payment.status = new_status
-                payment.updated_at = datetime.now(timezone.utc)
-                
-                # Если статус изменился на SUCCEEDED, продлеваем подписку
-                extended_user = None
-                if (new_status == PaymentStatus.SUCCEEDED and 
-                    old_status != PaymentStatus.SUCCEEDED):
-                    
-                    extended_user = await self._extend_user_subscription(payment)
-                    
-                    # Устанавливаем дату оплаты
-                    payment.paid_at = datetime.now(timezone.utc)
-                    payment.processed_at = datetime.now(timezone.utc)
-                
-                # Audit logging
-                await self._log_payment_operation(
-                    operation="UPDATE_PAYMENT_STATUS",
-                    payment_id=payment_id,
-                    admin_user=admin_user,
-                    details={
-                        "old_status": old_status.value,
-                        "new_status": new_status.value,
-                        "reason": reason,
-                        "subscription_extended": extended_user is not None,
-                        "user_id": payment.user_id
-                    }
-                )
-                
-                self.logger.info(
-                    "Payment status updated",
-                    payment_id=payment_id,
-                    user_id=payment.user_id,
-                    old_status=old_status.value,
-                    new_status=new_status.value,
-                    admin_user=admin_user,
-                    subscription_extended=extended_user is not None
-                )
-                
-                return payment
-                
-            except Exception as e:
-                await self.db.rollback()
-                self.logger.error(
-                    "Failed to update payment status",
-                    payment_id=payment_id,
-                    new_status=new_status.value,
-                    admin_user=admin_user,
-                    error=str(e),
-                    exc_info=True
-                )
-                raise
+                # Устанавливаем дату оплаты
+                payment.paid_at = datetime.now(timezone.utc)
+                payment.processed_at = datetime.now(timezone.utc)
+            
+            # Audit logging
+            await self._log_payment_operation(
+                operation="UPDATE_PAYMENT_STATUS",
+                payment_id=payment_id,
+                admin_user=admin_user,
+                details={
+                    "old_status": old_status.value,
+                    "new_status": new_status.value,
+                    "reason": reason,
+                    "subscription_extended": extended_user is not None,
+                    "user_id": payment.user_id
+                }
+            )
+            
+            self.logger.info(
+                "Payment status updated",
+                payment_id=payment_id,
+                user_id=payment.user_id,
+                old_status=old_status.value,
+                new_status=new_status.value,
+                admin_user=admin_user,
+                subscription_extended=extended_user is not None
+            )
+            
+            return payment
+            
+        except Exception as e:
+            self.logger.error(
+                "Failed to update payment status",
+                payment_id=payment_id,
+                new_status=new_status.value,
+                admin_user=admin_user,
+                error=str(e),
+                exc_info=True
+            )
+            raise
     
     async def get_user_payments_history(
         self,

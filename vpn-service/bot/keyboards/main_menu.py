@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from api_client import api_client
+# from api_client import api_client  # Убрано - заменено на прямые HTTP запросы
+import aiohttp
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -96,26 +97,44 @@ def get_existing_payment_keyboard(payment_id: int, payment_url: str) -> InlineKe
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+async def _make_api_request(endpoint: str) -> dict:
+    """Простой HTTP запрос к backend API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"http://backend:8000{endpoint}"
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    logger.error("API request failed", endpoint=endpoint, status=response.status)
+                    return {}
+    except Exception as e:
+        logger.error("API request error", endpoint=endpoint, error=str(e))
+        return {}
+
+
 async def get_user_subscription_days(telegram_id: int) -> int:
     """Получить количество дней до окончания подписки пользователя"""
     try:
         logger.info("🔍 Получаем данные пользователя для подсчета дней подписки", telegram_id=telegram_id)
         
-        # Получаем данные пользователя из API
-        user_data = await api_client.get_user_by_telegram_id(telegram_id)
+        # Получаем данные пользователя из API через прямой HTTP запрос
+        user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
         
-        if not user_data:
+        if not user_data or not user_data.get('success'):
             logger.warning("❌ Пользователь не найден в API", telegram_id=telegram_id)
             return 0
         
+        user_info = user_data.get('user', {})
+        
         logger.info("✅ Данные пользователя получены", 
                    telegram_id=telegram_id,
-                   subscription_status=user_data.get('subscription_status'),
-                   valid_until=user_data.get('valid_until'))
+                   subscription_status=user_info.get('subscription_status'),
+                   valid_until=user_info.get('valid_until'))
         
         # Проверяем статус подписки и дату окончания
-        subscription_status = user_data.get('subscription_status', 'none')
-        valid_until = user_data.get('valid_until')
+        subscription_status = user_info.get('subscription_status', 'none')
+        valid_until = user_info.get('valid_until')
         
         if subscription_status != 'active':
             logger.info("ℹ️ Подписка не активна", 
