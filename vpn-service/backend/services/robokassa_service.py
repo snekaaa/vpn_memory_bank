@@ -187,15 +187,26 @@ class RobokassaService:
                 'InvId': params.get('InvId')
             }
             
+            logger.info(f"🔍 SUCCESS SIGNATURE DEBUG:")
+            logger.info(f"  - OutSum: {params.get('OutSum')}")
+            logger.info(f"  - InvId: {params.get('InvId')}")
+            logger.info(f"  - Received signature: {received_signature}")
+            logger.info(f"  - Shop ID: {self.shop_id}")
+            logger.info(f"  - Using password1 (length: {len(self.password1) if self.password1 else 0})")
+            
             # Генерируем ожидаемую подпись с password1 (не password2!)
             expected_signature = self._generate_signature(signature_params, self.password1)
             
             # Сравниваем подписи
             is_valid = hmac.compare_digest(received_signature, expected_signature.lower())
             
+            logger.info(f"  - Expected signature: {expected_signature.lower()}")
+            logger.info(f"  - Signatures match: {is_valid}")
+            
             if not is_valid:
-                logger.warning(f"Invalid success signature for invoice {params.get('InvId')}")
-                logger.warning(f"Received: {received_signature}, Expected: {expected_signature.lower()}")
+                logger.error(f"❌ Invalid success signature for invoice {params.get('InvId')}")
+                logger.error(f"   Received: {received_signature}")
+                logger.error(f"   Expected: {expected_signature.lower()}")
             
             return is_valid
             

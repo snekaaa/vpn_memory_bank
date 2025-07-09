@@ -549,14 +549,25 @@ async def robokassa_success_handler(
         
         logger.info(f"Received Robokassa success: {params}")
         
-        # Валидируем подпись
+        # Получаем провайдера для диагностики
         robokassa_service = await get_robokassa_service(db)
+        
+        # Логируем конфигурацию для диагностики
+        logger.info(f"🔍 ROBOKASSA DEBUG:")
+        logger.info(f"  - Shop ID: {robokassa_service.shop_id}")
+        logger.info(f"  - Password1 length: {len(robokassa_service.password1) if robokassa_service.password1 else 0}")
+        logger.info(f"  - Password2 length: {len(robokassa_service.password2) if robokassa_service.password2 else 0}")
+        logger.info(f"  - Test mode: {robokassa_service.test_mode}")
+        
+        # Валидируем подпись
         if not robokassa_service.validate_success_signature(params):
-            logger.warning("Invalid success signature from Robokassa")
+            logger.error("❌ Invalid success signature from Robokassa")
             return JSONResponse(
                 content={"status": "error", "message": "Invalid signature"},
                 status_code=400
             )
+        
+        logger.info("✅ Valid Robokassa success signature")
         
         # Получаем информацию о платеже
         invoice_id = params.get('InvId')
