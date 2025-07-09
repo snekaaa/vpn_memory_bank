@@ -38,6 +38,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    dns:
+      - 127.0.0.11
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
