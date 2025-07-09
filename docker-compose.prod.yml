@@ -3,12 +3,12 @@ version: '3.8'
 services:
   bot:
     build:
-      context: ./bot
+      context: ./vpn-service/bot
     restart: always
     env_file: .env
     volumes:
-      - ./bot:/app
-      - ./backend:/app/backend
+      - ./vpn-service/bot:/app
+      - ./vpn-service/backend:/app/backend
     command: >
       bash -c "pip install sqlalchemy asyncpg &&
                python main_production.py"
@@ -24,8 +24,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: vpn-service/backend/Dockerfile
+      context: ./vpn-service
+      dockerfile: backend/Dockerfile
     restart: always
     ports:
       - "8001:8000"
