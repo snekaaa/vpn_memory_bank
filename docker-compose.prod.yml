@@ -16,9 +16,6 @@ services:
       - PYTHONUNBUFFERED=1
       - USE_SIMPLE_STORAGE=false
       - BACKEND_URL=http://backend:8000
-    depends_on:
-      - db
-      - backend
     networks:
       - vpn_network
 
@@ -35,16 +32,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8000
-    depends_on:
-      db:
-        condition: service_healthy
-    dns:
-      - 127.0.0.11
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - vpn_network
 
@@ -56,11 +43,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     env_file: .env
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - vpn_network
 
