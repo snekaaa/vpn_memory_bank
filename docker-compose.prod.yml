@@ -9,6 +9,9 @@ services:
     volumes:
       - ./vpn-service/bot:/app
       - ./vpn-service/backend:/app/backend
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
     command: >
       bash -c "pip install sqlalchemy asyncpg &&
                python main_production.py"
@@ -29,6 +32,9 @@ services:
     env_file: .env
     volumes:
       - ./vpn-service/backend:/app
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8000
