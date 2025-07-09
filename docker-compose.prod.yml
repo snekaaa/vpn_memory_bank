@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: ./bot
+    restart: always
+    env_file: .env
+    volumes:
+      - ./bot:/app
+      - ./backend:/app/backend
+    command: >
+      bash -c "pip install sqlalchemy asyncpg &&
+               python main_production.py"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - USE_SIMPLE_STORAGE=false
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - db
+      - backend
+    networks:
+      - vpn_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: vpn-service/backend/Dockerfile
+    restart: always
+    ports:
+      - "8001:8000"
+    env_file: .env
+    volumes:
+      - ./vpn-service/backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8000
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vpn_network
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file: .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vpn_network
+
+networks:
+  vpn_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: vpn-bezlagov_postgres_data
+    external: true 
