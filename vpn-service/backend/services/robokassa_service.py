@@ -61,11 +61,12 @@ class RobokassaService:
             # Для создания платежа
             signature_string = f"{params['MerchantLogin']}:{params['OutSum']}:{params['InvId']}:{password}"
         else:
-            # Для проверки результата
+            # Для проверки результата и success URL
             signature_string = f"{params['OutSum']}:{params['InvId']}:{password}"
         
-        # Логируем для отладки
-        logger.info(f"Signature string: {signature_string}")
+        # Логируем для отладки (маскируем пароль)
+        masked_string = signature_string.replace(password, "***")
+        logger.info(f"Signature string (masked): {masked_string}")
         
         # Создаем MD5 хеш
         signature = hashlib.md5(signature_string.encode('utf-8')).hexdigest()
@@ -168,6 +169,8 @@ class RobokassaService:
         """
         Проверка подписи SuccessURL (страница успешной оплаты)
         
+        Для SuccessURL Робокасса использует password1, а не password2
+        
         Args:
             params: Параметры от Робокассы
             
@@ -178,18 +181,21 @@ class RobokassaService:
             # Получаем подпись из параметров
             received_signature = params.get('SignatureValue', '').lower()
             
-            # Параметры для проверки подписи (аналогично ResultURL)
+            # Параметры для проверки подписи (без MerchantLogin)
             signature_params = {
                 'OutSum': params.get('OutSum'),
-                'InvId': params.get('InvId'),
-                'MerchantLogin': self.shop_id
+                'InvId': params.get('InvId')
             }
             
-            # Генерируем ожидаемую подпись
-            expected_signature = self._generate_signature(signature_params, self.password2)
+            # Генерируем ожидаемую подпись с password1 (не password2!)
+            expected_signature = self._generate_signature(signature_params, self.password1)
             
             # Сравниваем подписи
             is_valid = hmac.compare_digest(received_signature, expected_signature.lower())
+            
+            if not is_valid:
+                logger.warning(f"Invalid success signature for invoice {params.get('InvId')}")
+                logger.warning(f"Received: {received_signature}, Expected: {expected_signature.lower()}")
             
             return is_valid
             
