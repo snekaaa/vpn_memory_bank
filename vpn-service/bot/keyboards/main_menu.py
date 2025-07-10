@@ -33,6 +33,43 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     return keyboard
 
 
+async def get_subscription_keyboard_with_autopay() -> InlineKeyboardMarkup:
+    """Создает клавиатуру выбора подписки с опцией автоплатежа"""
+    from services.plans_api_client import plans_api_client
+    
+    buttons = []
+    
+    try:
+        # Получаем планы из API
+        subscription_plans = await plans_api_client.get_plans()
+        
+        for plan_id, plan in subscription_plans.items():
+            # Кнопка обычной оплаты
+            discount_text = f" (-{plan['discount']})" if plan.get('discount') else ""
+            button_text = f"{plan['name']} - {plan['price']}₽{discount_text}"
+            buttons.append([InlineKeyboardButton(
+                text=button_text,
+                callback_data=f"pay:{plan_id}"
+            )])
+            
+            # Кнопка с автоплатежом (только для не-триальных планов)
+            if plan_id != "trial":
+                autopay_text = f"⚡ {plan['name']} + Автоплатеж - {plan['price']}₽"
+                buttons.append([InlineKeyboardButton(
+                    text=autopay_text,
+                    callback_data=f"pay_autopay:{plan_id}"
+                )])
+    except Exception as e:
+        logger.error(f"Error loading subscription plans: {e}")
+        # В случае ошибки показываем кнопку "Попробовать позже"
+        buttons.append([InlineKeyboardButton(
+            text="⚠️ Планы временно недоступны",
+            callback_data="plans_unavailable"
+        )])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 async def get_subscription_keyboard_without_cancel() -> InlineKeyboardMarkup:
     """Создает клавиатуру выбора подписки БЕЗ кнопки отмены"""
     from services.plans_api_client import plans_api_client

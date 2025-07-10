@@ -25,6 +25,7 @@ from models.payment import Payment, PaymentStatus
 from models.payment_provider import (
     PaymentProvider, PaymentProviderType, PaymentProviderStatus
 )
+from models.auto_payment import AutoPayment
 from services.x3ui_client import x3ui_client
 from services.node_manager import NodeManager, NodeConfig
 from services.load_balancer import LoadBalancer
@@ -34,6 +35,7 @@ from services.x3ui_client_pool import X3UIClientPool
 from services.payment_processor import payment_processor_manager
 from services.payment_management_service import PaymentManagementService, get_payment_management_service
 from services.trial_automation_service import TrialAutomationService, get_trial_automation_service
+from services.auto_payment_service import AutoPaymentService
 from .auth import admin_auth, get_current_admin, optional_admin
 from .schemas import (
     AdminLoginRequest, AdminLoginResponse, UserListResponse, 
@@ -317,6 +319,33 @@ async def update_user(
     await db.commit()
     
     return {"message": "User updated successfully", "user_id": user_id}
+
+@router.post("/api/users/{user_id}/cancel-autopay")
+async def cancel_user_autopay(
+    user_id: int,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Отключение автоплатежа пользователя администратором"""
+    
+    # Находим пользователя
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Используем AutoPaymentService для отключения автоплатежа
+    auto_payment_service = AutoPaymentService(db)
+    cancel_result = await auto_payment_service.cancel_auto_payment(user_id)
+    
+    if cancel_result['success']:
+        return {"success": True, "message": "Автоплатеж успешно отключен"}
+    else:
+        raise HTTPException(
+            status_code=400, 
+            detail=cancel_result.get('message', 'Ошибка при отключении автоплатежа')
+        )
 
 # Роут для перегенерации VPN ключей удален согласно требованиям
 
@@ -2310,6 +2339,8 @@ async def admin_user_profile_page(
 ):
     """Страница профиля пользователя с историей платежей"""
     try:
+        logger.info("Loading user profile page", user_id=user_id)
+        
         # Получаем пользователя
         result = await db.execute(
             select(User).where(User.id == user_id)
@@ -2317,60 +2348,106 @@ async def admin_user_profile_page(
         user = result.scalar_one_or_none()
         
         if not user:
+            logger.warning("User not found", user_id=user_id)
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
+        logger.info("User found", user_id=user_id, username=user.username)
+        
         # Получаем историю платежей
-        payment_service = PaymentManagementService(db)
-        offset = (page - 1) * size
-        payments = await payment_service.get_user_payments_history(
-            user_id=user_id,
-            limit=size,
-            offset=offset
-        )
+        try:
+            payment_service = get_payment_management_service(db)
+            offset = (page - 1) * size
+            payments = await payment_service.get_user_payments_history(
+                user_id=user_id,
+                limit=size,
+                offset=offset
+            )
+            logger.info("Payments loaded", user_id=user_id, payments_count=len(payments))
+        except Exception as e:
+            logger.error("Error loading payments", user_id=user_id, error=str(e))
+            payments = []
         
         # Подсчитываем общую статистику
-        total_payments_count = await db.scalar(
-            select(func.count(Payment.id)).where(Payment.user_id == user_id)
-        )
+        try:
+            total_payments_count = await db.scalar(
+                select(func.count(Payment.id)).where(Payment.user_id == user_id)
+            ) or 0
+            
+            total_amount = await db.scalar(
+                select(func.sum(Payment.amount))
+                .where(Payment.user_id == user_id)
+                .where(Payment.status == PaymentStatus.SUCCEEDED)
+            ) or 0.0
+            
+            # Подсчитываем статистику по статусам
+            pending_payments = await db.scalar(
+                select(func.count(Payment.id))
+                .where(Payment.user_id == user_id)
+                .where(Payment.status == PaymentStatus.PENDING)
+            ) or 0
+            
+            failed_payments = await db.scalar(
+                select(func.count(Payment.id))
+                .where(Payment.user_id == user_id)
+                .where(Payment.status == PaymentStatus.FAILED)
+            ) or 0
+            
+            logger.info("Payment stats calculated", 
+                       user_id=user_id, 
+                       total_payments=total_payments_count,
+                       total_amount=total_amount)
+        except Exception as e:
+            logger.error("Error calculating payment stats", user_id=user_id, error=str(e))
+            total_payments_count = 0
+            total_amount = 0.0
+            pending_payments = 0
+            failed_payments = 0
         
-        total_amount = await db.scalar(
-            select(func.sum(Payment.amount))
-            .where(Payment.user_id == user_id)
-            .where(Payment.status == PaymentStatus.SUCCEEDED)
-        ) or 0.0
-        
-        # Подсчитываем статистику по статусам
-        pending_payments = await db.scalar(
-            select(func.count(Payment.id))
-            .where(Payment.user_id == user_id)
-            .where(Payment.status == PaymentStatus.PENDING)
-        ) or 0
-        
-        failed_payments = await db.scalar(
-            select(func.count(Payment.id))
-            .where(Payment.user_id == user_id)
-            .where(Payment.status == PaymentStatus.FAILED)
-        ) or 0
+        # Получаем активный автоплатеж пользователя
+        try:
+            auto_payment_result = await db.execute(
+                select(AutoPayment)
+                .where(AutoPayment.user_id == user_id)
+                .where(AutoPayment.status == "active")
+                .order_by(AutoPayment.created_at.desc())
+                .limit(1)
+            )
+            user.auto_payment = auto_payment_result.scalar_one_or_none()
+            logger.info("Auto payment loaded", 
+                       user_id=user_id, 
+                       has_autopay=user.auto_payment is not None)
+        except Exception as e:
+            logger.error("Error loading auto payment", user_id=user_id, error=str(e))
+            user.auto_payment = None
         
         # Подготавливаем данные для шаблона
         payments_data = []
-        for payment in payments:
-            payments_data.append({
-                "id": payment.id,
-                "amount": payment.amount,
-                "status": payment.status.value,
-                "payment_method": payment.payment_method.value,
-                "description": payment.description,
-                "created_at": payment.created_at,
-                "paid_at": payment.paid_at,
-                "updated_at": payment.updated_at
-            })
+        try:
+            for payment in payments:
+                payments_data.append({
+                    "id": payment.id,
+                    "amount": payment.amount,
+                    "status": payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+                    "payment_method": payment.payment_method.value if hasattr(payment.payment_method, 'value') else str(payment.payment_method),
+                    "description": payment.description,
+                    "created_at": payment.created_at,
+                    "paid_at": payment.paid_at,
+                    "updated_at": payment.updated_at
+                })
+        except Exception as e:
+            logger.error("Error preparing payment data", user_id=user_id, error=str(e))
+            payments_data = []
         
-        total_pages = (total_payments_count + size - 1) // size
+        total_pages = (total_payments_count + size - 1) // size if total_payments_count > 0 else 1
+        
+        logger.info("User profile page prepared successfully", 
+                   user_id=user_id, 
+                   total_pages=total_pages,
+                   payments_data_count=len(payments_data))
         
         return templates.TemplateResponse("admin/user_profile.html", {
             "request": request,
-            "title": f"Профиль пользователя {user.username or user.first_name}",
+            "title": f"Профиль пользователя {user.username or user.first_name or f'ID {user.id}'}",
             "user": user,
             "payments": payments_data,
             "current_page": page,
@@ -2388,8 +2465,13 @@ async def admin_user_profile_page(
             ]
         })
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Error loading user profile page", user_id=user_id, error=str(e))
+        logger.error("Unexpected error loading user profile page", 
+                    user_id=user_id, 
+                    error=str(e), 
+                    error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Ошибка загрузки профиля пользователя")
 
 @router.get("/api/users/{user_id}/payments")

@@ -14,6 +14,9 @@ from models.subscription import Subscription
 from models.vpn_node import VPNNode
 from models.payment import Payment
 from models.user_node_assignment import UserNodeAssignment
+from models.auto_payment import AutoPayment
+from models.payment_retry_attempt import PaymentRetryAttempt
+from models.user_notification_preferences import UserNotificationPreferences
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

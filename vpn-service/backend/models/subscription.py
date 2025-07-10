@@ -44,9 +44,19 @@ class Subscription(Base):
     auto_renewal = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     
+    # Поля для автоплатежей
+    auto_payment_enabled = Column(Boolean, default=False)
+    robokassa_recurring_id = Column(String(255), unique=True, nullable=True)
+    recurring_setup_payment_id = Column(Integer, ForeignKey("payments.id"), nullable=True)
+    next_billing_date = Column(DateTime(timezone=True), nullable=True, index=True)  # Ключевое поле для cron
+    auto_payment_amount = Column(Numeric(10, 2), nullable=True)
+    auto_payment_status = Column(String(20), default="inactive", index=True)  # 'active', 'paused', 'cancelled'
+    
     # Связи (упрощенная архитектура - убрана back_populates с subscriptions)
     # user = relationship("User")  # Закомментировано для избежания circular imports
     # payments = relationship("Payment", back_populates="subscription")  # Закомментировано
+    # setup_payment = relationship("Payment", foreign_keys=[recurring_setup_payment_id])
+    # auto_payment = relationship("AutoPayment", back_populates="subscription", uselist=False)
     
     def __repr__(self):
         return f"<Subscription(id={self.id}, user_id={self.user_id}, type={self.subscription_type}, status={self.status})>"
@@ -80,3 +90,8 @@ class Subscription(Base):
             SubscriptionType.YEARLY: "Годовая подписка"
         }
         return plan_names.get(self.subscription_type, "Подписка") 
+    
+    @property
+    def has_autopay(self) -> bool:
+        """Проверка наличия активного автоплатежа"""
+        return self.auto_payment_enabled and self.auto_payment_status == "active" 

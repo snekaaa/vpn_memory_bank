@@ -160,7 +160,7 @@ class VPNManagerX3UI:
             if dashboard_result and dashboard_result.get("success"):
                 # Пользователь существует, проверяем активные ключи
                 vpn_keys = dashboard_result.get("vpn_keys", [])
-                active_keys = [key for key in vpn_keys if key.get("status") == "active"]
+                active_keys = [key for key in vpn_keys if key.get("status") == "ACTIVE"]
                 
                 if active_keys:
                     # Есть активный ключ - возвращаем последний
@@ -202,37 +202,45 @@ class VPNManagerX3UI:
                 "/api/v1/integration/full-cycle",
                 {
                     "telegram_id": telegram_id,
-                    "user_data": user_data
+                    "user_data": user_data,
+                    "subscription_type": "trial"
                 }
             )
             
             if cycle_result and cycle_result.get("success"):
+                # Получаем VPN ключ из результата создания пользователя
                 final_data = cycle_result.get("final_data", {})
                 vpn_key = final_data.get("vpn_key", {})
                 
-                if vpn_key:
-                    logger.info("✅ New user and key created successfully", 
+                if vpn_key and vpn_key.get("vless_url"):
+                    logger.info("✅ Created user and key via full-cycle", 
                                telegram_id=telegram_id,
                                key_id=vpn_key.get("id"))
                     
                     return {
                         "success": True,
-                        "message": "VPN ключ создан с 7 днями триала",
+                        "message": "Создан новый пользователь и VPN ключ",
                         "vless_url": vpn_key.get("vless_url"),
                         "id": vpn_key.get("id"),
                         "created_at": vpn_key.get("created_at"),
                         "status": "active",
                         "is_new": True,
-                        "x3ui_connected": False,
-                        "source": "NEW_USER_FULL_CYCLE"
+                        "x3ui_connected": True,
+                        "source": "FULL_CYCLE_NEW_USER"
                     }
-            
-            logger.error("❌ Failed to create user and key", 
-                        telegram_id=telegram_id)
-            return {"success": False, "error": "Failed to create VPN key"}
-            
+                else:
+                    logger.error("❌ Full-cycle completed but no VPN key", 
+                                telegram_id=telegram_id)
+                    return {"success": False, "error": "No VPN key after user creation"}
+            else:
+                error_msg = cycle_result.get("error", "Unknown error") if cycle_result else "API unavailable"
+                logger.error("❌ Failed to create user via full-cycle", 
+                            telegram_id=telegram_id,
+                            error=error_msg)
+                return {"success": False, "error": error_msg}
+                
         except Exception as e:
-            logger.error("💥 Error in get_or_create_user_key", 
+            logger.error("❌ Failed to create user and key", 
                         telegram_id=telegram_id, 
                         error=str(e))
             return {"success": False, "error": str(e)}

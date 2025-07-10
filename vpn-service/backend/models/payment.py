@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Text, Enum, JSON, Float
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Text, Enum, JSON, Float, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from config.database import Base
@@ -27,6 +27,14 @@ class PaymentMethod(str, enum.Enum):
     manual_trial = "manual_trial"          # Ручной триальный платеж
     auto_trial = "auto_trial"              # Автоматический триальный платеж
     manual_correction = "manual_correction" # Ручная корректировка платежа
+
+class RecurringStatus(str, enum.Enum):
+    """Статусы рекуррентных платежей"""
+    INACTIVE = "inactive"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
 
 class Payment(Base):
     """Модель платежа"""
@@ -57,6 +65,19 @@ class Payment(Base):
     robokassa_signature = Column(String, nullable=True)
     robokassa_payment_method = Column(String, nullable=True)
     
+    # Поля для рекуррентных платежей
+    robokassa_recurring_id = Column(String, nullable=True)  # ID рекуррентного платежа в Robokassa
+    is_recurring_enabled = Column(Boolean, default=False)
+    recurring_period_days = Column(Integer, nullable=True)
+    next_payment_date = Column(DateTime(timezone=True), nullable=True)
+    recurring_status = Column(Enum(RecurringStatus), default=RecurringStatus.INACTIVE)
+    is_recurring_setup = Column(Boolean, default=False)  # Флаг первого платежа для setup
+    
+    # Поля для автоплатежей
+    is_autopay_generated = Column(Boolean, default=False)  # Флаг автоматически созданного платежа
+    autopay_attempt_number = Column(Integer, nullable=True)  # Номер попытки автоплатежа
+    autopay_parent_payment_id = Column(Integer, ForeignKey('payments.id'), nullable=True)  # Связь с первым платежом
+    
     # Временные метки
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -72,6 +93,7 @@ class Payment(Base):
     # user = relationship("User", back_populates="payments")
     # subscription = relationship("Subscription", back_populates="payments")  
     # provider = relationship("PaymentProvider", back_populates="payments")
+    # child_autopayments = relationship("Payment", backref="parent_payment", foreign_keys=[autopay_parent_payment_id])
     
     def __repr__(self):
         return f"<Payment(id={self.id}, user_id={self.user_id}, amount={self.amount}, status={self.status})>"

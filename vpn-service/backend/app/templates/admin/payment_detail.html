@@ -241,6 +241,154 @@
     </div>
 </div>
 
+<!-- Auto Payment Info -->
+{% if payment.is_recurring_setup or payment.is_autopay_generated %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card admin-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-arrow-repeat me-2"></i>Информация об автоплатеже
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if payment.is_recurring_setup %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Тип платежа</label>
+                                <div>
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-arrow-repeat"></i> Первый платеж для настройки автоплатежа
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Recurring ID</label>
+                                <div>
+                                    {% if payment.robokassa_recurring_id %}
+                                        <code>{{ payment.robokassa_recurring_id }}</code>
+                                    {% else %}
+                                        <span class="text-muted">Ожидает настройки</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Статус автоплатежа</label>
+                                <div>
+                                    {% if payment.recurring_status %}
+                                        <span class="badge bg-{% if payment.recurring_status == 'active' %}success{% else %}secondary{% endif %}">
+                                            {{ payment.recurring_status }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Период автоплатежа</label>
+                                <div class="fw-bold">
+                                    {% if payment.recurring_period_days %}
+                                        {{ payment.recurring_period_days }} дней
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Следующее списание</label>
+                                <div class="fw-bold">
+                                    {% if payment.next_payment_date %}
+                                        {{ payment.next_payment_date.strftime('%d.%m.%Y %H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if payment.child_autopayments %}
+                    <hr>
+                    <h6 class="mb-3">Связанные автоплатежи</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID платежа</th>
+                                    <th>Сумма</th>
+                                    <th>Статус</th>
+                                    <th>Дата</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for autopay in payment.child_autopayments %}
+                                <tr>
+                                    <td>
+                                        <a href="/admin/payments/{{ autopay.id }}">#{{ autopay.id }}</a>
+                                    </td>
+                                    <td>{{ "{:,.2f}".format(autopay.amount) }} ₽</td>
+                                    <td>
+                                        <span class="badge bg-{% if autopay.status == 'SUCCEEDED' %}success{% else %}secondary{% endif %}">
+                                            {{ autopay.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ autopay.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                    <td>
+                                        <a href="/admin/payments/{{ autopay.id }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                    
+                {% elif payment.is_autopay_generated %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Тип платежа</label>
+                                <div>
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-arrow-clockwise"></i> Автоматически созданный платеж
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Попытка №</label>
+                                <div class="fw-bold">
+                                    {{ payment.autopay_attempt_number or 1 }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Родительский платеж</label>
+                                <div>
+                                    {% if payment.autopay_parent_payment_id %}
+                                        <a href="/admin/payments/{{ payment.autopay_parent_payment_id }}">
+                                            #{{ payment.autopay_parent_payment_id }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Raw Data -->
 <div class="row">
     <div class="col-12">

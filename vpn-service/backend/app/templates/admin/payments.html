@@ -148,6 +148,7 @@
                     <th>Услуга</th>
                     <th>Сумма</th>
                     <th>Статус</th>
+                    <th>Тип</th>
                     <th>Метод</th>
                     <th>Robokassa ID</th>
                     <th>Создан</th>
@@ -187,6 +188,21 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if payment.is_recurring_setup %}
+                            <span class="badge bg-info">
+                                <i class="bi bi-arrow-repeat"></i> Первый recurring
+                            </span>
+                        {% elif payment.is_autopay_generated %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-clockwise"></i> Автоплатеж
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-credit-card"></i> Обычный
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
                         <span class="badge bg-info">{{ payment.payment_method.value }}</span>
                     </td>
                     <td>
@@ -213,7 +229,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         <i class="bi bi-inbox me-2"></i>Платежи не найдены
                     </td>
                 </tr>

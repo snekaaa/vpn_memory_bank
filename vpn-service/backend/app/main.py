@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import structlog
 from config.database import engine, get_db
 from config.settings import get_settings
-from routes import auth, users, subscriptions, payments, vpn_keys, webhooks, integration, health_check, test_routes
+from routes import auth, users, subscriptions, payments, vpn_keys, webhooks, integration, health_check, test_routes, auto_payments
 from models import database
 import os
 
@@ -62,6 +62,7 @@ app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(integration.router, prefix="/api/v1")
 app.include_router(health_check.router, prefix="/api/v1")
 app.include_router(test_routes.router, prefix="/test")
+app.include_router(auto_payments.router, prefix="/api/v1")
 
 # Подключение админки
 from app.admin.routes import router as admin_router

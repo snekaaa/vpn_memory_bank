@@ -36,6 +36,7 @@ class CreatePaymentRequest(BaseModel):
     success_url: Optional[str] = Field(None, description="URL успешной оплаты")
     fail_url: Optional[str] = Field(None, description="URL неуспешной оплаты")
     provider_type: Optional[str] = Field(None, description="Тип платежного провайдера")
+    enable_autopay: bool = Field(False, description="Включить автоплатеж после успешной оплаты")
 
 class CreatePaymentResponse(BaseModel):
     """Ответ на создание платежа"""
@@ -139,7 +140,11 @@ async def create_payment(
                     'subscription_type': request.subscription_type,
                     'service_name': request.service_name,
                     'duration_days': plan['duration_days']
-                }
+                },
+                # Добавляем поля для автоплатежей
+                is_recurring_setup=request.enable_autopay,
+                is_recurring_enabled=request.enable_autopay,
+                recurring_period_days=plan['duration_days'] if request.enable_autopay else None
             )
             
             db.add(payment)
@@ -147,14 +152,27 @@ async def create_payment(
             await db.refresh(payment)
             
             # Создаем URL для оплаты
-            payment_result = robokassa_service.create_payment_url(
-                order_id=str(payment.id),
-                amount=payment.amount,
-                description=payment.description,
-                email=request.user_email,
-                success_url=request.success_url,
-                failure_url=request.fail_url
-            )
+            if request.enable_autopay:
+                # Используем create_recurring_payment_url для автоплатежей
+                payment_result = robokassa_service.create_recurring_payment_url(
+                    order_id=str(payment.id),
+                    amount=payment.amount,
+                    description=payment.description,
+                    recurring=True,
+                    email=request.user_email,
+                    success_url=request.success_url,
+                    failure_url=request.fail_url
+                )
+            else:
+                # Обычный платеж
+                payment_result = robokassa_service.create_payment_url(
+                    order_id=str(payment.id),
+                    amount=payment.amount,
+                    description=payment.description,
+                    email=request.user_email,
+                    success_url=request.success_url,
+                    failure_url=request.fail_url
+                )
             payment_url = payment_result['url']
             
             # Обновляем запись с внешним ID
@@ -207,7 +225,11 @@ async def create_payment(
                 'subscription_type': request.subscription_type,
                 'service_name': request.service_name,
                 'duration_days': plan['duration_days']
-            }
+            },
+            # Добавляем поля для автоплатежей
+            is_recurring_setup=request.enable_autopay and provider.provider_type == PaymentProviderType.robokassa,
+            is_recurring_enabled=request.enable_autopay and provider.provider_type == PaymentProviderType.robokassa,
+            recurring_period_days=plan['duration_days'] if request.enable_autopay and provider.provider_type == PaymentProviderType.robokassa else None
         )
         
         db.add(payment)
@@ -230,14 +252,28 @@ async def create_payment(
             logger.info(f"Robokassa provider config being used: {masked_config}")
 
             robokassa_service = RobokassaService(provider_config=provider_config)
-            payment_result = robokassa_service.create_payment_url(
-                order_id=str(payment.id),
-                amount=payment.amount,
-                description=payment.description,
-                email=request.user_email,
-                success_url=request.success_url,
-                failure_url=request.fail_url
-            )
+            
+            if request.enable_autopay:
+                # Используем create_recurring_payment_url для автоплатежей
+                payment_result = robokassa_service.create_recurring_payment_url(
+                    order_id=str(payment.id),
+                    amount=payment.amount,
+                    description=payment.description,
+                    recurring=True,
+                    email=request.user_email,
+                    success_url=request.success_url,
+                    failure_url=request.fail_url
+                )
+            else:
+                # Обычный платеж
+                payment_result = robokassa_service.create_payment_url(
+                    order_id=str(payment.id),
+                    amount=payment.amount,
+                    description=payment.description,
+                    email=request.user_email,
+                    success_url=request.success_url,
+                    failure_url=request.fail_url
+                )
             payment_url = payment_result['url']
             
             payment.external_id = str(payment.id)
@@ -698,6 +734,44 @@ async def process_robokassa_payment(params: Dict[str, Any], db: AsyncSession):
             
             if result.get('status') == 'success':
                 logger.info(f"Subscription activated for user {payment.user_id}")
+                
+                # Проверяем, нужно ли настроить автоплатеж
+                if payment.is_recurring_setup and payment.is_recurring_enabled:
+                    logger.info(f"🔄 Setting up autopayment for payment {payment.id}")
+                    
+                    # Импортируем сервис автоплатежей
+                    from services.auto_payment_service import AutoPaymentService
+                    
+                    auto_payment_service = AutoPaymentService(db)
+                    autopay_result = await auto_payment_service.setup_auto_payment(
+                        user_id=payment.user_id,
+                        payment_id=payment.id,
+                        previous_invoice_id=invoice_id
+                    )
+                    
+                    if autopay_result['success']:
+                        logger.info(f"✅ Autopayment setup successful: {autopay_result}")
+                        
+                        # Отправляем уведомление пользователю об успешной настройке автоплатежа
+                        from services.notification_service import notification_service
+                        
+                        try:
+                            # Получаем пользователя для отправки уведомления
+                            user_result = await db.execute(
+                                select(User).where(User.id == payment.user_id)
+                            )
+                            user = user_result.scalar_one_or_none()
+                            
+                            if user and user.telegram_id:
+                                await notification_service.send_autopay_setup_success(
+                                    telegram_id=user.telegram_id,
+                                    amount=payment.amount,
+                                    next_payment_date=autopay_result.get('next_payment_date')
+                                )
+                        except Exception as notify_error:
+                            logger.error(f"Error sending autopay notification: {notify_error}")
+                    else:
+                        logger.error(f"❌ Failed to setup autopayment: {autopay_result.get('message')}")
             else:
                 logger.error(f"Failed to activate subscription: {result.get('message')}")
         

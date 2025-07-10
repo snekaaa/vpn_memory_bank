@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
-from config.database import get_db, init_database
+from config.database import get_db, get_db_session, init_database
 from routes.admin_nodes import router as nodes_router
 from routes.test_routes import router as test_router
 from routes.integration import router as integration_router
@@ -57,7 +57,7 @@ HEALTH_CHECK_INTERVAL = 300  # 5 минут
 async def startup_event():
     """Действия при запуске приложения"""
     # Инициализируем базу данных
-    init_database()
+    await init_database()
     
     # Запускаем задачу проверки здоровья нод
     asyncio.create_task(health_check_task())
@@ -75,14 +75,14 @@ async def health_check_task():
     while True:
         try:
             # Получаем сессию БД
-            db = next(get_db())
+            db = get_db_session()
             
             # Создаем экземпляр HealthChecker
             health_checker = HealthChecker(db)
             
             # Проверяем все ноды
             logger.info("🔍 Выполняем проверку здоровья всех нод...")
-            results = await health_checker.check_all_nodes_health()
+            results = await health_checker.check_all_nodes()
             
             # Логируем результаты
             healthy_nodes = sum(1 for r in results.values() if r.get('is_healthy', False))

@@ -16,7 +16,8 @@ from keyboards.main_menu import (
     get_user_subscription_days,
     get_subscription_keyboard_without_cancel,
     get_payment_confirmation_keyboard_back_only,
-    get_existing_payment_keyboard
+    get_existing_payment_keyboard,
+    get_subscription_keyboard_with_autopay
 )
 from services.plans_api_client import plans_api_client
 # from api_client import api_client  # Отключен - используем локальный SimpleAPIClient
@@ -84,11 +85,63 @@ def get_payment_confirmation_keyboard(plan_id: str) -> InlineKeyboardMarkup:
 
 @router.message(F.text.startswith("💳 Подписка"))
 async def show_subscription_plans(message: Message, state: FSMContext):
-    """Показать планы подписок или существующие неоплаченные счета"""
+    """Показать планы подписок или существующие неоплаченные счета с информацией об автоплатежах"""
     try:
         telegram_id = message.from_user.id
         
-        # Сначала проверяем есть ли у пользователя неоплаченные платежи
+        # Сначала проверяем есть ли у пользователя автоплатеж
+        api_client = SimpleAPIClient()
+        auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
+        
+        if auto_payment_info and auto_payment_info.get('enabled'):
+            # У пользователя есть активный автоплатеж
+            subscription_info = await api_client.get_user_subscription_status(telegram_id)
+            
+            if subscription_info and subscription_info.get('success'):
+                plan_name = subscription_info.get('plan_name', 'Подписка')
+                end_date = subscription_info.get('end_date')
+                
+                # Форматируем дату следующего платежа
+                next_payment_date = auto_payment_info.get('next_payment_date')
+                if next_payment_date:
+                    from datetime import datetime
+                    try:
+                        next_date = datetime.fromisoformat(next_payment_date.replace('Z', '+00:00'))
+                        next_date_str = next_date.strftime('%d.%m.%Y')
+                    except:
+                        next_date_str = next_payment_date
+                else:
+                    next_date_str = 'Не определена'
+                
+                text = (
+                    f"💳 **Ваша подписка**\n\n"
+                    f"📊 **Тариф:** {plan_name}\n"
+                    f"📅 **Действует до:** {end_date}\n\n"
+                    f"⚡ **Автоплатеж:** 🟢 Активен\n"
+                    f"💰 **Сумма:** {auto_payment_info['amount']}₽\n"
+                    f"📅 **Следующее списание:** {next_date_str}\n\n"
+                    f"💡 Подписка будет автоматически продлена"
+                )
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="❌ Отключить автоплатеж",
+                        callback_data="autopay_disable"
+                    )],
+                    [InlineKeyboardButton(
+                        text="⬅️ Главное меню",
+                        callback_data="back_to_main_menu"
+                    )]
+                ])
+                
+                await message.answer(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+                return
+        
+        # Проверяем есть ли у пользователя неоплаченные платежи
         pending_payments_response = await SimpleAPIClient().get_user_pending_payments(telegram_id)
         
         if pending_payments_response and pending_payments_response.get('pending_payments'):
@@ -151,30 +204,37 @@ async def show_subscription_plans(message: Message, state: FSMContext):
             await state.set_state(PaymentStates.processing_payment)
             return
         
-        # Нет неоплаченных платежей - показываем планы БЕЗ кнопки отмены
+        # Нет неоплаченных платежей - показываем планы с автоплатежом
         await state.set_state(PaymentStates.selecting_plan)
         
-        # Получаем планы из API для формирования текста
-        try:
-            subscription_plans = await plans_api_client.get_plans()
-            
-            text_lines = ["🎯 **Выберите план подписки:**\n"]
-            for plan_id, plan in subscription_plans.items():
-                discount_text = f" **-{plan['discount']}**" if plan.get('discount') else ""
-                text_lines.append(f"• {plan['name']} - {plan['price']}₽ ({plan['duration']}){discount_text}")
-            
-            text_lines.append("\n💡 Чем дольше подписка, тем больше скидка!")
-            text = "\n".join(text_lines)
-            
-        except Exception as e:
-            logger.error(f"Error loading plans for text: {e}")
+        # Проверяем активность подписки
+        subscription_info = await api_client.get_user_subscription_status(telegram_id)
+        days_remaining = 0
+        
+        if subscription_info and subscription_info.get('success'):
+            days_remaining = subscription_info.get('days_remaining', 0)
+        
+        if days_remaining > 0:
+            # Подписка активна, но автоплатеж не настроен
             text = (
-                "🎯 **Выберите план подписки:**\n\n"
-                "⚠️ Загрузка актуальных цен...\n\n"
-                "💡 Чем дольше подписка, тем больше скидка!"
+                f"💳 **Ваша подписка**\n\n"
+                f"📊 **Тариф:** {subscription_info.get('plan_name', 'Подписка')}\n"
+                f"📅 **Истекает:** {subscription_info.get('end_date')} "
+                f"(через {days_remaining} дн.)\n\n"
+                f"💡 **Настройте автоплатеж** для автоматического продления\n"
+                f"✅ Удобно - не нужно помнить о продлении\n"
+                f"✅ Надежно - подписка никогда не прервется"
+            )
+        else:
+            # Подписка истекла
+            text = (
+                f"💳 **Подписка истекла**\n\n"
+                f"📊 Выберите тариф для продления:\n\n"
+                f"⚡ **С автоплатежом** - автоматическое продление\n"
+                f"💳 **Обычная оплата** - разовый платеж"
             )
         
-        keyboard = await get_subscription_keyboard_without_cancel()
+        keyboard = await get_subscription_keyboard_with_autopay()
         
         await message.answer(
             text,
@@ -608,6 +668,225 @@ async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
         logger.error(f"Error returning to main menu: {e}")
         await callback.answer("❌ Произошла ошибка")
 
+@router.callback_query(F.data.startswith("pay_autopay:"))
+async def handle_autopay_payment(callback: CallbackQuery, state: FSMContext):
+    """Обработка оплаты с автоплатежом"""
+    try:
+        plan_id = callback.data.split(":")[1]
+        user_id = callback.from_user.id
+        
+        # Обновляем сообщение о создании платежа
+        await callback.message.edit_text(
+            "⏳ Создание платежа с автоплатежом...",
+            reply_markup=None
+        )
+        
+        api_client = SimpleAPIClient()
+        
+        # Получаем user_id из базы данных
+        user_data = await api_client.get_user_by_telegram_id(user_id)
+        if not user_data:
+            await callback.message.edit_text(
+                "❌ Пользователь не найден. Пожалуйста, начните с команды /start",
+                reply_markup=get_back_to_menu_keyboard()
+            )
+            return
+        
+        # Получаем информацию о плане для названия услуги
+        plan = await plans_api_client.get_plan(plan_id)
+        if not plan:
+            await callback.message.edit_text(
+                "❌ План подписки не найден",
+                reply_markup=get_back_to_menu_keyboard()
+            )
+            return
+        
+        # Создаем платеж с флагом автоплатежа
+        payment_data = {
+            "user_id": user_data["id"],
+            "subscription_type": plan_id,
+            "service_name": plan["name"],
+            "user_email": f"user_{user_id}@telegram.local",
+            "success_url": f"https://t.me/vpn_bezlagov_test_bot?start=payment_success",
+            "fail_url": f"https://t.me/vpn_bezlagov_test_bot?start=payment_fail",
+            "provider_type": "robokassa",  # Автоплатежи только через Robokassa
+            "enable_autopay": True  # Ключевой флаг
+        }
+        
+        payment_result = await api_client.create_payment(payment_data)
+        
+        if payment_result.get("status") == "success":
+            payment_url = payment_result["payment_url"]
+            payment_id = payment_result["payment_id"]
+            amount = payment_result["amount"]
+            
+            # Сохраняем ID платежа в состоянии
+            await state.update_data(payment_id=payment_id)
+            
+            # Создаем клавиатуру с кнопкой оплаты
+            payment_keyboard = get_existing_payment_keyboard(payment_id, payment_url)
+            
+            text = (
+                f"💳 **Оплата с автоплатежом**\n\n"
+                f"📋 **План:** {plan['name']}\n"
+                f"💰 **Сумма:** {amount}₽\n\n"
+                f"⚡ **Автоплатеж будет настроен** после первой оплаты\n"
+                f"🔄 Подписка будет автоматически продлеваться каждый период\n\n"
+                f"👆 Нажмите для перехода к оплате"
+            )
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=payment_keyboard,
+                parse_mode="Markdown"
+            )
+            
+        else:
+            error_message = payment_result.get('detail', 'Неизвестная ошибка')
+            await callback.message.edit_text(
+                f"❌ Ошибка создания платежа: {error_message}",
+                reply_markup=get_back_to_menu_keyboard()
+            )
+        
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error handling autopay payment: {e}")
+        await callback.message.edit_text(
+            "❌ Произошла ошибка при создании платежа",
+            reply_markup=get_back_to_menu_keyboard()
+        )
+        await callback.answer()
+
+@router.callback_query(F.data == "autopay_disable")
+async def handle_autopay_disable(callback: CallbackQuery):
+    """Отключение автоплатежа"""
+    try:
+        telegram_id = callback.from_user.id
+        
+        # Подтверждение отключения
+        text = (
+            "⚠️ **Отключение автоплатежа**\n\n"
+            "Вы уверены, что хотите отключить автоматическое продление подписки?\n\n"
+            "После отключения нужно будет продлевать подписку вручную."
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✅ Да, отключить",
+                callback_data="autopay_disable_confirm"
+            )],
+            [InlineKeyboardButton(
+                text="❌ Отмена",
+                callback_data="back_to_subscription"
+            )]
+        ])
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error handling autopay disable: {e}")
+        await callback.answer("❌ Произошла ошибка")
+
+@router.callback_query(F.data == "autopay_disable_confirm")
+async def handle_autopay_disable_confirm(callback: CallbackQuery):
+    """Подтверждение отключения автоплатежа"""
+    try:
+        telegram_id = callback.from_user.id
+        
+        # Отключаем автоплатеж через API
+        api_client = SimpleAPIClient()
+        result = await api_client.cancel_user_auto_payment(telegram_id)
+        
+        if result and result.get('success'):
+            text = (
+                "✅ **Автоплатеж отключен**\n\n"
+                "Автоматическое продление подписки отключено.\n"
+                "Теперь нужно будет продлевать подписку вручную."
+            )
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="📋 Планы подписок",
+                    callback_data="show_plans"
+                )],
+                [InlineKeyboardButton(
+                    text="⬅️ Главное меню",
+                    callback_data="back_to_main_menu"
+                )]
+            ])
+        else:
+            text = (
+                "❌ **Ошибка**\n\n"
+                "Не удалось отключить автоплатеж. Попробуйте позже или обратитесь в поддержку."
+            )
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="🔄 Попробовать снова",
+                    callback_data="autopay_disable"
+                )],
+                [InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="back_to_subscription"
+                )]
+            ])
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error confirming autopay disable: {e}")
+        await callback.answer("❌ Произошла ошибка")
+
+@router.callback_query(F.data == "back_to_subscription")
+async def back_to_subscription_view(callback: CallbackQuery):
+    """Возврат к просмотру подписки"""
+    try:
+        # Эмулируем обработку команды "💳 Подписка"
+        from aiogram.types import Message
+        
+        # Создаем фейковое сообщение для вызова обработчика
+        await show_subscription_plans(callback.message, FSMContext())
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error going back to subscription: {e}")
+        await callback.answer("❌ Произошла ошибка")
+
+@router.callback_query(F.data == "show_plans")
+async def show_plans_callback(callback: CallbackQuery):
+    """Показать планы подписок (callback версия)"""
+    try:
+        keyboard = await get_subscription_keyboard_with_autopay()
+        
+        text = (
+            f"💳 **Выберите план подписки**\n\n"
+            f"⚡ **С автоплатежом** - автоматическое продление\n"
+            f"💳 **Обычная оплата** - разовый платеж\n\n"
+            f"💡 Чем дольше подписка, тем больше скидка!"
+        )
+        
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error showing plans: {e}")
+        await callback.answer("❌ Произошла ошибка")
+
 class SimpleAPIClient:
     """Упрощенный API клиент для работы с backend"""
     
@@ -657,3 +936,15 @@ class SimpleAPIClient:
     async def get_active_payment_providers(self) -> Dict:
         """Получение списка активных провайдеров"""
         return await self._make_request("GET", "/api/v1/payments/providers/active")
+
+    async def get_user_auto_payment_info(self, telegram_id: int) -> Dict:
+        """Получение информации об автоплатеже пользователя"""
+        return await self._make_request("GET", f"/api/v1/users/{telegram_id}/auto_payment_info")
+
+    async def get_user_subscription_status(self, telegram_id: int) -> Dict:
+        """Получение статуса подписки пользователя"""
+        return await self._make_request("GET", f"/api/v1/users/{telegram_id}/subscription_status")
+
+    async def cancel_user_auto_payment(self, telegram_id: int) -> Dict:
+        """Отключение автоплатежа пользователя"""
+        return await self._make_request("POST", f"/api/v1/users/{telegram_id}/auto_payment/disable")

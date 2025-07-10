@@ -1,0 +1,7 @@
+HTTP/1.1 302 Found
+date: Thu, 10 Jul 2025 09:15:14 GMT
+server: uvicorn
+content-length: 0
+location: /admin/dashboard
+set-cookie: admin_session=Dpk1AMB-yvNgyp17xk8fnvfkSsDuqmd4LMcUOibb04Q; HttpOnly; Max-Age=28800; Path=/; SameSite=lax
+
