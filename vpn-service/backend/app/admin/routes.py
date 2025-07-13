@@ -600,7 +600,7 @@ async def get_users_paginated(db: AsyncSession, page: int = 1, size: int = 50, s
     }
 
 async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50, status: Optional[str] = None):
-    """Получение VPN ключей с пагинацией и актуальными данными из 3xui"""
+    """Получение VPN ключей с пагинацией (только из БД, без X3UI)"""
     offset = (page - 1) * size
     
     # Базовый запрос с join к пользователям (явный JOIN вместо relationship)
@@ -626,105 +626,12 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
     )
     rows = result.all()
     
-    # Собираем уникальные node_id для batch запросов к 3xui
-    unique_node_ids = set()
-    for vpn_key, _ in rows:
-        if vpn_key.node_id:
-            unique_node_ids.add(vpn_key.node_id)
-    
-    # Получаем информацию о всех нодах одним запросом
-    nodes_info = {}
-    if unique_node_ids:
-        nodes_result = await db.execute(
-            select(VPNNode).where(VPNNode.id.in_(unique_node_ids))
-        )
-        for node in nodes_result.scalars().all():
-            nodes_info[node.id] = {
-                "id": node.id,
-                "name": node.name,
-                "priority": node.priority,
-                "location": node.location,
-                "status": node.status,
-                "node_obj": node  # Для возможных операций с 3xui
-            }
-    
-    # Группируем уникальные inbound для запросов к 3xui
-    inbound_stats_cache = {}
-    unique_inbounds = {}
-    for vpn_key, _ in rows:
-        if vpn_key.node_id and vpn_key.xui_inbound_id:
-            unique_inbounds.setdefault((vpn_key.node_id, vpn_key.xui_inbound_id), None)
-
-    from services.x3ui_client import X3UIClient
-    import json
-    # Запрашиваем статистику для каждого inbound
-    for (node_id, inbound_id) in unique_inbounds:
-        try:
-            node = nodes_info.get(node_id, {}).get("node_obj")
-            if not node:
-                continue
-            client = X3UIClient(
-                base_url=node.x3ui_url,
-                username=node.x3ui_username,
-                password=node.x3ui_password
-            )
-            if await client._login():
-                resp = await client._make_request("GET", f"/panel/api/inbounds/get/{inbound_id}")
-                if resp and resp.get("success"):
-                    obj = resp.get("obj", {})
-                    settings = json.loads(obj.get("settings", "{}"))
-                    clients = settings.get("clients", [])
-                    stats_list = obj.get("clientStats") or []  # Обрабатываем None
-                    stats_map = {}
-                    for c in clients:
-                        cid = c.get("id")
-                        if not cid:
-                            continue
-                        # Безопасно ищем статистику по email
-                        client_email = c.get("email", "")
-                        stats = {}
-                        if stats_list:  # Дополнительная проверка
-                            stats = next((s for s in stats_list if s.get("email") == client_email), {})
-                        
-                        up = stats.get("up", 0)
-                        down = stats.get("down", 0)
-                        stats_map[cid] = {
-                            "up_traffic": up,
-                            "down_traffic": down,
-                            "total_traffic": up + down,
-                            "enabled": c.get("enable", False)
-                        }
-                    inbound_stats_cache[inbound_id] = stats_map
-        except Exception as e:
-            logger.warning(f"Failed to get stats for inbound {inbound_id} on node {node_id}: {e}")
-            continue
-
-    # Формируем ответ
+    # Формируем ответ (только данные из БД)
     key_items = []
     for vpn_key, user in rows:
-        # Инициализируем переменные
-        node_info = {}
-        x3ui_data = None
-        
-        # Получаем информацию о ноде
-        if vpn_key.node_id in nodes_info:
-            node_info = {k: v for k, v in nodes_info[vpn_key.node_id].items() if k != "node_obj"}
-        
-        # Получаем данные трафика из кэша 3xui
-        if vpn_key.xui_inbound_id and vpn_key.xui_client_id:
-            stats_map = inbound_stats_cache.get(vpn_key.xui_inbound_id, {})
-            x3ui_data = stats_map.get(vpn_key.xui_client_id)
-        
-        # Определяем данные трафика (из 3xui или БД)
-        if x3ui_data:
-            total_bytes = x3ui_data["total_traffic"]
-            up = x3ui_data["up_traffic"]
-            down = x3ui_data["down_traffic"]
-        else:
-            total_bytes = vpn_key.total_download + vpn_key.total_upload
-            up = vpn_key.total_upload
-            down = vpn_key.total_download
-        
+        total_bytes = vpn_key.total_download + vpn_key.total_upload
+        up = vpn_key.total_upload
+        down = vpn_key.total_download
         key_items.append({
             "id": vpn_key.id,
             "user_id": vpn_key.user_id,
@@ -739,7 +646,7 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
             "user_username": user.username if user else None,
             "traffic_gb": round(total_bytes / (1024**3), 2),
             "vless_url": vpn_key.vless_url,
-            "node_info": node_info,
+            "node_info": {},
             "client_email": vpn_key.xui_email,
             "client_id": vpn_key.xui_client_id,
         })
