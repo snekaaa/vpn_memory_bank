@@ -62,7 +62,6 @@
                     <th>Client ID</th>
                     <th>Нода</th>
                     <th>Статус</th>
-                    <th>Трафик</th>
                     <th>Создан</th>
                 </tr>
             </thead>
@@ -124,19 +123,6 @@
                         {% elif key.status == 'revoked' %}
                         <span class="badge bg-danger">Отозван</span>
                         {% endif %}
-                    </td>
-                    <td>
-                        <small>
-                            {% if key.traffic_gb > 0 %}
-                            <strong>{{ key.traffic_gb }} ГБ</strong><br>
-                            <span class="text-muted">
-                                ↓{{ (key.total_download / 1024**3)|round(2) }} 
-                                ↑{{ (key.total_upload / 1024**3)|round(2) }}
-                            </span>
-                            {% else %}
-                            <span class="text-muted">Нет данных</span>
-                            {% endif %}
-                        </small>
                     </td>
                     <td>
                         {% if key.created_at %}
