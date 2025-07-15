@@ -603,8 +603,8 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
     """Получение VPN ключей с пагинацией (только из БД, без X3UI)"""
     offset = (page - 1) * size
     
-    # Базовый запрос с join к пользователям (явный JOIN вместо relationship)
-    base_query = select(VPNKey, User).join(User, VPNKey.user_id == User.id, isouter=True)
+    # Базовый запрос с join к пользователям и нодам
+    base_query = select(VPNKey, User, VPNNode).join(User, VPNKey.user_id == User.id, isouter=True).join(VPNNode, VPNKey.node_id == VPNNode.id, isouter=True)
     count_query = select(func.count(VPNKey.id))
     
     # Фильтр по статусу
@@ -617,7 +617,7 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     
-    # Получаем ключи с пользователями
+    # Получаем ключи с пользователями и нодами
     result = await db.execute(
         base_query
         .offset(offset)
@@ -628,10 +628,19 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
     
     # Формируем ответ (только данные из БД)
     key_items = []
-    for vpn_key, user in rows:
+    for vpn_key, user, node in rows:
         total_bytes = vpn_key.total_download + vpn_key.total_upload
         up = vpn_key.total_upload
         down = vpn_key.total_download
+        node_info = {}
+        if node:
+            node_info = {
+                "id": node.id,
+                "name": node.name,
+                "priority": node.priority,
+                "status": node.status,
+                "location": node.location,
+            }
         key_items.append({
             "id": vpn_key.id,
             "user_id": vpn_key.user_id,
@@ -646,7 +655,7 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
             "user_username": user.username if user else None,
             "traffic_gb": round(total_bytes / (1024**3), 2),
             "vless_url": vpn_key.vless_url,
-            "node_info": {},
+            "node_info": node_info,
             "client_email": vpn_key.xui_email,
             "client_id": vpn_key.xui_client_id,
         })
