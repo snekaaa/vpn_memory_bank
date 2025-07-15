@@ -302,6 +302,22 @@ async def migrate_user(
     
     return {"success": True}
 
+@router.post("/{node_id:int}/activate")
+async def activate_node(node_id: int, db: AsyncSession = Depends(get_db)):
+    node_manager = NodeManager(db)
+    updated_node = await node_manager.update_node(node_id, {"status": "active"})
+    if not updated_node:
+        raise HTTPException(status_code=400, detail="Не удалось активировать ноду")
+    return {"success": True}
+
+@router.post("/{node_id:int}/deactivate")
+async def deactivate_node(node_id: int, db: AsyncSession = Depends(get_db)):
+    node_manager = NodeManager(db)
+    updated_node = await node_manager.update_node(node_id, {"status": "inactive"})
+    if not updated_node:
+        raise HTTPException(status_code=400, detail="Не удалось деактивировать ноду")
+    return {"success": True}
+
 @router.post("/api/test-x3ui-connection")
 async def test_x3ui_connection_api(
     request: Request,

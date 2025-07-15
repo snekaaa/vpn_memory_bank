@@ -161,10 +161,17 @@
                             <a href="/admin/nodes/{{ node.id }}/edit" class="btn btn-sm btn-outline-secondary" title="Редактировать">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                    onclick="deleteNode({{ node.id }}, '{{ node.name }}')" title="Удалить">
-                                <i class="bi bi-trash"></i>
+                            {% if node.status == 'active' %}
+                            <button type="button" class="btn btn-sm btn-outline-warning" 
+                                    onclick="deactivateNode({{ node.id }}, '{{ node.name }}')" title="Деактивировать">
+                                <i class="bi bi-pause-circle"></i>
                             </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-outline-success" 
+                                    onclick="activateNode({{ node.id }}, '{{ node.name }}')" title="Активировать">
+                                <i class="bi bi-play-circle"></i>
+                            </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -227,10 +234,17 @@
                 <a href="/admin/nodes/{{ node.id }}/edit" class="btn btn-outline-secondary btn-sm flex-fill">
                     <i class="bi bi-pencil me-1"></i>Изменить
                 </a>
-                <button type="button" class="btn btn-outline-danger btn-sm flex-fill" 
-                        onclick="deleteNode({{ node.id }}, '{{ node.name }}')">
-                    <i class="bi bi-trash me-1"></i>Удалить
+                {% if node.status == 'active' %}
+                <button type="button" class="btn btn-outline-warning btn-sm flex-fill" 
+                        onclick="deactivateNode({{ node.id }}, '{{ node.name }}')">
+                    <i class="bi bi-pause-circle me-1"></i>Деактивировать
                 </button>
+                {% else %}
+                <button type="button" class="btn btn-outline-success btn-sm flex-fill" 
+                        onclick="activateNode({{ node.id }}, '{{ node.name }}')">
+                    <i class="bi bi-play-circle me-1"></i>Активировать
+                </button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -345,28 +359,42 @@
         }
     });
     
-    // Delete node function
-    async function deleteNode(nodeId, nodeName) {
-        if (!confirm(`Вы уверены, что хотите удалить ноду "${nodeName}"?`)) {
+    // Удаляю функцию deleteNode и добавляю activateNode/deactivateNode
+    async function activateNode(nodeId, nodeName) {
+        if (!confirm(`Вы уверены, что хотите активировать ноду "${nodeName}"?`)) {
             return;
         }
-        
         const spinner = adminUtils.showSpinner();
-        
         try {
-            const formData = new FormData();
-            formData.append('migrate_users', 'true');
-            
-            const response = await fetch(`/admin/nodes/${nodeId}/delete`, {
-                method: 'POST',
-                body: formData
+            const response = await fetch(`/admin/nodes/${nodeId}/activate`, {
+                method: 'POST'
             });
-            
             if (response.ok) {
-                adminUtils.showToast(`Нода "${nodeName}" успешно удалена`, 'success');
+                adminUtils.showToast(`Нода "${nodeName}" активирована`, 'success');
                 setTimeout(() => location.reload(), 1000);
             } else {
-                adminUtils.showToast('Ошибка при удалении ноды', 'danger');
+                adminUtils.showToast('Ошибка при активации ноды', 'danger');
+            }
+        } catch (error) {
+            adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
+        } finally {
+            adminUtils.hideSpinner(spinner);
+        }
+    }
+    async function deactivateNode(nodeId, nodeName) {
+        if (!confirm(`Вы уверены, что хотите деактивировать ноду "${nodeName}"?`)) {
+            return;
+        }
+        const spinner = adminUtils.showSpinner();
+        try {
+            const response = await fetch(`/admin/nodes/${nodeId}/deactivate`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                adminUtils.showToast(`Нода "${nodeName}" деактивирована`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                adminUtils.showToast('Ошибка при деактивации ноды', 'danger');
             }
         } catch (error) {
             adminUtils.showToast(`Ошибка: ${error.message}`, 'danger');
