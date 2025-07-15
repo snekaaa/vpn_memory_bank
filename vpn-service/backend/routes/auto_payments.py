@@ -68,31 +68,23 @@ async def get_user_subscription_status(
                 'message': 'Пользователь не найден'
             }
         
-        # Получаем активную подписку
-        subscription_result = await db.execute(
-            select(Subscription).where(
-                Subscription.user_id == user.id,
-                Subscription.status == 'active'
-            )
-        )
-        subscription = subscription_result.scalar_one_or_none()
-        
-        if not subscription:
+        # Проверяем активную подписку по данным пользователя
+        if not user.has_active_subscription:
             return {
                 'success': False,
                 'message': 'Активная подписка не найдена'
             }
         
         # Форматируем дату окончания
-        end_date_str = subscription.end_date.strftime('%d.%m.%Y') if subscription.end_date else 'Не определена'
+        end_date_str = user.valid_until.strftime('%d.%m.%Y') if user.valid_until else 'Не определена'
         
         return {
             'success': True,
-            'plan_name': subscription.plan_name,
+            'plan_name': 'VPN подписка',  # Временно статическое значение
             'end_date': end_date_str,
-            'days_remaining': subscription.days_remaining,
-            'subscription_type': subscription.subscription_type.value,
-            'has_autopay': subscription.has_autopay
+            'days_remaining': user.subscription_days_remaining,
+            'subscription_type': 'active',
+            'has_autopay': False  # Временно статическое значение
         }
         
     except Exception as e:

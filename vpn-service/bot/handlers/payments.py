@@ -83,62 +83,69 @@ def get_payment_confirmation_keyboard(plan_id: str) -> InlineKeyboardMarkup:
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+async def show_active_subscription_info(message: Message, subscription_info: dict, telegram_id: int):
+    """Показать информацию об активной подписке с управлением автоплатежом"""
+    
+    # Получаем информацию об автоплатеже
+    api_client = SimpleAPIClient()
+    auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
+    
+    end_date = subscription_info.get('end_date')
+    days_remaining = subscription_info.get('days_remaining', 0)
+    
+    # Определяем статус автоплатежа
+    if auto_payment_info and auto_payment_info.get('enabled'):
+        autopay_status = "✅ Включен"
+        autopay_button_text = "❌ Отключить автопродление"
+        autopay_callback = "autopay_disable"
+    else:
+        autopay_status = "❌ Отключен"
+        autopay_button_text = "✅ Включить автопродление"
+        autopay_callback = "autopay_enable"
+    
+    text = (
+        f"💳 **Ваша подписка действует до {end_date}**\n\n"
+        f"⏰ **Осталось:** {days_remaining} дн.\n\n"
+        f"⚡ **Автопродление:** {autopay_status}\n\n"
+        f"💡 **Докупить подписку:**"
+    )
+    
+    # Используем существующую клавиатуру с автоплатежом
+    keyboard = await get_subscription_keyboard_with_autopay()
+    
+    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+
+async def show_subscription_plans_selection(message: Message, state: FSMContext):
+    """Показать выбор планов подписки для пользователей без активной подписки"""
+    
+    await state.set_state(PaymentStates.selecting_plan)
+    
+    text = (
+        f"💳 **Выберите план подписки:**\n\n"
+        f"📊 Доступные тарифы для подключения VPN сервиса"
+    )
+    
+    # Используем существующую клавиатуру с автоплатежом
+    keyboard = await get_subscription_keyboard_with_autopay()
+    
+    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+
 @router.message(F.text.startswith("💳 Подписка"))
 async def show_subscription_plans(message: Message, state: FSMContext):
-    """Показать планы подписок или существующие неоплаченные счета с информацией об автоплатежах"""
+    """Показать информацию о подписке или планы для покупки"""
     try:
         telegram_id = message.from_user.id
-        
-        # Сначала проверяем есть ли у пользователя автоплатеж
         api_client = SimpleAPIClient()
-        auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
         
-        if auto_payment_info and auto_payment_info.get('enabled'):
-            # У пользователя есть активный автоплатеж
-            subscription_info = await api_client.get_user_subscription_status(telegram_id)
+        # 1. СНАЧАЛА проверяем статус подписки по valid_until
+        subscription_info = await api_client.get_user_subscription_status(telegram_id)
+        
+        if subscription_info and subscription_info.get('success'):
+            days_remaining = subscription_info.get('days_remaining', 0)
             
-            if subscription_info and subscription_info.get('success'):
-                plan_name = subscription_info.get('plan_name', 'Подписка')
-                end_date = subscription_info.get('end_date')
-                
-                # Форматируем дату следующего платежа
-                next_payment_date = auto_payment_info.get('next_payment_date')
-                if next_payment_date:
-                    from datetime import datetime
-                    try:
-                        next_date = datetime.fromisoformat(next_payment_date.replace('Z', '+00:00'))
-                        next_date_str = next_date.strftime('%d.%m.%Y')
-                    except:
-                        next_date_str = next_payment_date
-                else:
-                    next_date_str = 'Не определена'
-                
-                text = (
-                    f"💳 **Ваша подписка**\n\n"
-                    f"📊 **Тариф:** {plan_name}\n"
-                    f"📅 **Действует до:** {end_date}\n\n"
-                    f"⚡ **Автоплатеж:** 🟢 Активен\n"
-                    f"💰 **Сумма:** {auto_payment_info['amount']}₽\n"
-                    f"📅 **Следующее списание:** {next_date_str}\n\n"
-                    f"💡 Подписка будет автоматически продлена"
-                )
-                
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="❌ Отключить автоплатеж",
-                        callback_data="autopay_disable"
-                    )],
-                    [InlineKeyboardButton(
-                        text="⬅️ Главное меню",
-                        callback_data="back_to_main_menu"
-                    )]
-                ])
-                
-                await message.answer(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode="Markdown"
-                )
+            if days_remaining > 0:
+                # АКТИВНАЯ ПОДПИСКА - показать информацию + управление автоплатежом
+                await show_active_subscription_info(message, subscription_info, telegram_id)
                 return
         
         # Проверяем есть ли у пользователя неоплаченные платежи
@@ -204,52 +211,12 @@ async def show_subscription_plans(message: Message, state: FSMContext):
             await state.set_state(PaymentStates.processing_payment)
             return
         
-        # Нет неоплаченных платежей - показываем планы с автоплатежом
-        await state.set_state(PaymentStates.selecting_plan)
-        
-        # Проверяем активность подписки
-        subscription_info = await api_client.get_user_subscription_status(telegram_id)
-        days_remaining = 0
-        
-        if subscription_info and subscription_info.get('success'):
-            days_remaining = subscription_info.get('days_remaining', 0)
-        
-        if days_remaining > 0:
-            # Подписка активна, но автоплатеж не настроен
-            text = (
-                f"💳 **Ваша подписка**\n\n"
-                f"📊 **Тариф:** {subscription_info.get('plan_name', 'Подписка')}\n"
-                f"📅 **Истекает:** {subscription_info.get('end_date')} "
-                f"(через {days_remaining} дн.)\n\n"
-                f"💡 **Настройте автоплатеж** для автоматического продления\n"
-                f"✅ Удобно - не нужно помнить о продлении\n"
-                f"✅ Надежно - подписка никогда не прервется"
-            )
-        else:
-            # Подписка истекла
-            text = (
-                f"💳 **Подписка истекла**\n\n"
-                f"📊 Выберите тариф для продления:\n\n"
-                f"⚡ **С автоплатежом** - автоматическое продление\n"
-                f"💳 **Обычная оплата** - разовый платеж"
-            )
-        
-        keyboard = await get_subscription_keyboard_with_autopay()
-        
-        await message.answer(
-            text,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        # 2. НЕТ АКТИВНОЙ ПОДПИСКИ - показать планы
+        await show_subscription_plans_selection(message, state)
         
     except Exception as e:
         logger.error(f"Error showing subscription plans: {e}")
-        # Получаем количество дней для главного меню
-        days_remaining = await get_user_subscription_days(message.from_user.id)
-        await message.answer(
-            "❌ Произошла ошибка при загрузке планов подписки",
-            reply_markup=get_main_menu(days_remaining)
-        )
+        await message.answer("❌ Произошла ошибка при загрузке информации о подписке")
 
 @router.callback_query(F.data.startswith("pay:"))
 async def handle_plan_selection(callback: CallbackQuery, state: FSMContext):
