@@ -17,7 +17,8 @@ from keyboards.main_menu import (
     get_subscription_keyboard_without_cancel,
     get_payment_confirmation_keyboard_back_only,
     get_existing_payment_keyboard,
-    get_subscription_keyboard_with_autopay
+    get_subscription_keyboard_with_autopay,
+    send_main_menu
 )
 from services.plans_api_client import plans_api_client
 # from api_client import api_client  # Отключен - используем локальный SimpleAPIClient
@@ -216,7 +217,7 @@ async def show_subscription_plans(message: Message, state: FSMContext):
         
     except Exception as e:
         logger.error(f"Error showing subscription plans: {e}")
-        await message.answer("❌ Произошла ошибка при загрузке информации о подписке")
+        await send_main_menu(message, message.from_user.id, "❌ Произошла ошибка при загрузке информации о подписке")
 
 @router.callback_query(F.data.startswith("pay:"))
 async def handle_plan_selection(callback: CallbackQuery, state: FSMContext):
@@ -619,18 +620,9 @@ async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
     """Возврат в главное меню"""
     try:
         await state.clear()
-        
-        # Получаем количество дней для главного меню
-        days_remaining = await get_user_subscription_days(callback.from_user.id)
-        
         await callback.message.delete()
-        await callback.message.answer(
-            "🏠 Главное меню",
-            reply_markup=get_main_menu(days_remaining)
-        )
-        
+        await send_main_menu(callback.message, callback.from_user.id)
         await callback.answer()
-        
     except Exception as e:
         logger.error(f"Error returning to main menu: {e}")
         await callback.answer("❌ Произошла ошибка")

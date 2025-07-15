@@ -236,6 +236,14 @@ async def get_user_subscription_days(telegram_id: int) -> int:
                     error=str(e))
         return 0
 
+async def send_main_menu(message, telegram_id, text="🏠 Главное меню"):
+    """Универсальный хелпер для отправки главного меню с актуальным количеством дней подписки"""
+    days_remaining = await get_user_subscription_days(telegram_id)
+    await message.answer(
+        text,
+        reply_markup=get_main_menu(days_remaining)
+    )
+
 def get_main_menu(days_remaining: int = 0) -> ReplyKeyboardMarkup:
     """Главное меню с кнопками для быстрого доступа"""
     

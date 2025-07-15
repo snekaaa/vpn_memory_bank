@@ -5,7 +5,7 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from keyboards.main_menu import get_main_menu_keyboard, get_main_menu, get_user_subscription_days
+from keyboards.main_menu import get_main_menu_keyboard, get_main_menu, get_user_subscription_days, send_main_menu
 from templates.messages import (
     get_download_apps_message,
     get_vpn_key_message,
@@ -48,30 +48,15 @@ async def start_command(message: types.Message, state: FSMContext):
             f"Выберите действие в меню ниже:"
         )
         
-        # Получаем количество дней до окончания подписки
-        days_remaining = await get_user_subscription_days(telegram_id)
-        
-        await message.answer(
-            welcome_msg,
-            reply_markup=get_main_menu(days_remaining),
-            parse_mode="Markdown"
-        )
-        
+        await send_main_menu(message, telegram_id, welcome_msg)
         logger.info("Authorization successful", telegram_id=telegram_id, is_admin=is_admin)
         
     except Exception as e:
         logger.error("Authorization error", error=str(e))
-        
-        # Получаем количество дней даже при ошибке
         try:
-            days_remaining = await get_user_subscription_days(telegram_id)
+            await send_main_menu(message, message.from_user.id, "⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
         except:
-            days_remaining = 0
-            
-        await message.answer(
-            "⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start",
-            reply_markup=get_main_menu(days_remaining)
-        )
+            await message.answer("⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
 
 @start_router.message(F.text == "🔑 Мой VPN ключ")
 async def vpn_key_handler(message: types.Message):
