@@ -126,6 +126,39 @@ async def disable_user_auto_payment(
             detail="Ошибка отключения автоплатежа"
         )
 
+
+@router.post("/{telegram_id}/auto_payment/enable")
+async def enable_user_auto_payment(
+    telegram_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Включение автоплатежа пользователя по telegram_id"""
+    try:
+        # Находим пользователя по telegram_id
+        result = await db.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {
+                'success': False,
+                'message': 'Пользователь не найден'
+            }
+        
+        # Включаем автоплатеж
+        auto_payment_service = AutoPaymentService(db)
+        result = await auto_payment_service.enable_auto_payment(user.id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error enabling auto payment: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка включения автоплатежа"
+        )
+
 @router.get("/{telegram_id}/pending_payments")
 async def get_user_pending_payments(
     telegram_id: int,

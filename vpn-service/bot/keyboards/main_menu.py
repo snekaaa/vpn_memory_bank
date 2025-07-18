@@ -98,6 +98,60 @@ async def get_subscription_keyboard_without_cancel() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+async def get_subscription_keyboard_with_autopay_toggle(autopay_enabled: bool = True) -> InlineKeyboardMarkup:
+    """Создает клавиатуру выбора подписки с кнопкой переключения автопродления"""
+    from services.plans_api_client import plans_api_client
+    
+    buttons = []
+    
+    # Кнопка переключения автопродления
+    if autopay_enabled:
+        autopay_text = "⚡ Автопродление (вкл)"
+        autopay_callback = "toggle_autopay_off"
+    else:
+        autopay_text = "❌ Автопродление (выкл)"
+        autopay_callback = "toggle_autopay_on"
+    
+    buttons.append([InlineKeyboardButton(
+        text=autopay_text,
+        callback_data=autopay_callback
+    )])
+    
+    try:
+        # Получаем планы из API
+        subscription_plans = await plans_api_client.get_plans()
+        
+        for plan_id, plan in subscription_plans.items():
+            discount_text = f" (-{plan['discount']})" if plan.get('discount') else ""
+            
+            # Если автопродление включено - показываем планы с автоплатежом
+            # Если выключено - показываем обычные планы
+            if autopay_enabled:
+                if plan_id != "trial":  # Триал не поддерживает автоплатеж
+                    button_text = f"⚡ {plan['name']} - {plan['price']}₽{discount_text}"
+                    callback_data = f"pay_autopay:{plan_id}"
+                else:
+                    button_text = f"{plan['name']} - {plan['price']}₽{discount_text}"
+                    callback_data = f"pay:{plan_id}"
+            else:
+                button_text = f"{plan['name']} - {plan['price']}₽{discount_text}"
+                callback_data = f"pay:{plan_id}"
+            
+            buttons.append([InlineKeyboardButton(
+                text=button_text,
+                callback_data=callback_data
+            )])
+    except Exception as e:
+        logger.error(f"Error loading subscription plans: {e}")
+        # В случае ошибки показываем кнопку "Попробовать позже"
+        buttons.append([InlineKeyboardButton(
+            text="⚠️ Планы временно недоступны",
+            callback_data="plans_unavailable"
+        )])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def get_payment_confirmation_keyboard_back_only(plan_id: str) -> InlineKeyboardMarkup:
     """Создает клавиатуру подтверждения платежа ТОЛЬКО с кнопкой Назад"""
     buttons = [

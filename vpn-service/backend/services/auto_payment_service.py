@@ -5,12 +5,12 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from models.auto_payment import AutoPayment, AutoPaymentStatus
 from models.payment import Payment, PaymentStatus, RecurringStatus
-from models.subscription import Subscription, SubscriptionType
+from models.subscription import Subscription, SubscriptionType, SubscriptionStatus
 from models.user import User
 from services.robokassa_service import RobokassaService
 from services.subscription_service import SubscriptionService
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AutoPaymentService:
     """Сервис для работы с автоплатежами"""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         
     async def setup_auto_payment(
@@ -129,58 +129,79 @@ class AutoPaymentService:
             Результат отмены
         """
         try:
-            # Находим активный автоплатеж
-            auto_payment = await self._get_active_auto_payment(user_id)
-            
-            if not auto_payment:
-                return {
-                    'success': False,
-                    'message': 'Активный автоплатеж не найден'
-                }
-            
-            # Получаем SubscriptionService и инициализируем RobokassaService
-            subscription_service = SubscriptionService(self.db)
-            robokassa_service = await subscription_service._get_robokassa_service()
-            cancel_result = await robokassa_service.cancel_recurring_subscription(
-                auto_payment.robokassa_recurring_id
+            # Находим пользователя
+            result = await self.db.execute(
+                select(User).where(User.id == user_id)
             )
+            user = result.scalar_one_or_none()
             
-            if cancel_result['success']:
-                # Обновляем статус в БД
-                auto_payment.status = AutoPaymentStatus.CANCELLED
-                
-                # Обновляем подписку
-                subscription = self.db.query(Subscription).filter(
-                    Subscription.id == auto_payment.subscription_id
-                ).first()
-                
-                if subscription:
-                    subscription.auto_payment_enabled = False
-                    subscription.auto_payment_status = 'cancelled'
-                
-                self.db.commit()
-                
-                logger.info(f"✅ Автоплатеж отменен для пользователя {user_id}")
-                
-                return {
-                    'success': True,
-                    'message': 'Автоплатеж отключен'
-                }
-            else:
-                logger.error(f"❌ Ошибка отмены автоплатежа в Robokassa: {cancel_result.get('result')}")
+            if not user:
                 return {
                     'success': False,
-                    'message': 'Ошибка отмены автоплатежа'
+                    'message': 'Пользователь не найден'
                 }
+            
+            # Отключаем настройку автоплатежа
+            user.autopay_enabled = False
+            await self.db.commit()
+            
+            logger.info(f"✅ Автоплатеж отключен для пользователя {user_id}")
+            
+            return {
+                'success': True,
+                'message': 'Автоплатеж отключен'
+            }
                 
         except Exception as e:
-            logger.error(f"Ошибка отмены автоплатежа: {e}")
-            self.db.rollback()
+            logger.error(f"Ошибка отключения автоплатежа: {e}")
+            await self.db.rollback()
             return {
                 'success': False,
-                'message': str(e)
+                'message': 'Ошибка отключения автоплатежа'
             }
     
+    async def enable_auto_payment(self, user_id: int) -> Dict[str, Any]:
+        """
+        Включение автоплатежа пользователя
+        
+        Args:
+            user_id: ID пользователя
+            
+        Returns:
+            Результат включения
+        """
+        try:
+            # Находим пользователя
+            result = await self.db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                return {
+                    'success': False,
+                    'message': 'Пользователь не найден'
+                }
+            
+            # Сохраняем настройку автоплатежа
+            user.autopay_enabled = True
+            await self.db.commit()
+            
+            logger.info(f"✅ Автоплатеж включен для пользователя {user_id}")
+            
+            return {
+                'success': True,
+                'message': 'Автоплатеж включен'
+            }
+                
+        except Exception as e:
+            logger.error(f"Ошибка включения автоплатежа: {e}")
+            await self.db.rollback()
+            return {
+                'success': False,
+                'message': 'Ошибка включения автоплатежа'
+            }
+
     async def get_user_auto_payment_info(self, user_id: int) -> Dict[str, Any]:
         """
         Получение информации об автоплатеже пользователя
@@ -191,43 +212,55 @@ class AutoPaymentService:
         Returns:
             Информация об автоплатеже
         """
-        auto_payment = await self._get_active_auto_payment(user_id)
-        
-        if auto_payment:
+        try:
+            # Находим пользователя
+            result = await self.db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                return {'enabled': False, 'message': 'Пользователь не найден'}
+            
             return {
-                'enabled': True,
-                'amount': float(auto_payment.amount),
-                'currency': auto_payment.currency,
-                'next_payment_date': auto_payment.next_payment_date,
-                'period_days': auto_payment.period_days,
-                'status': auto_payment.status,
-                'attempts_count': auto_payment.attempts_count,
-                'last_attempt_date': auto_payment.last_attempt_date
+                'enabled': user.autopay_enabled,
+                'message': 'Включен' if user.autopay_enabled else 'Отключен'
             }
-        
-        return {'enabled': False}
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения информации об автоплатеже: {e}")
+            return {'enabled': False, 'message': 'Ошибка получения информации'}
     
     async def _get_payment(self, payment_id: int) -> Optional[Payment]:
         """Получение платежа по ID"""
-        return self.db.query(Payment).filter(Payment.id == payment_id).first()
+        result = await self.db.execute(
+            select(Payment).where(Payment.id == payment_id)
+        )
+        return result.scalar_one_or_none()
     
     async def _get_user_subscription(self, user_id: int) -> Optional[Subscription]:
         """Получение активной подписки пользователя"""
-        return self.db.query(Subscription).filter(
-            and_(
-                Subscription.user_id == user_id,
-                Subscription.status == 'active'
+        result = await self.db.execute(
+            select(Subscription).where(
+                and_(
+                    Subscription.user_id == user_id,
+                    Subscription.status == SubscriptionStatus.ACTIVE
+                )
             )
-        ).first()
+        )
+        return result.scalar_one_or_none()
     
     async def _get_active_auto_payment(self, user_id: int) -> Optional[AutoPayment]:
         """Получение активного автоплатежа пользователя"""
-        return self.db.query(AutoPayment).filter(
-            and_(
-                AutoPayment.user_id == user_id,
-                AutoPayment.status == AutoPaymentStatus.ACTIVE
+        result = await self.db.execute(
+            select(AutoPayment).where(
+                and_(
+                    AutoPayment.user_id == user_id,
+                    AutoPayment.status == AutoPaymentStatus.ACTIVE
+                )
             )
-        ).first()
+        )
+        return result.scalar_one_or_none()
     
     def _get_period_days(self, subscription_type: SubscriptionType) -> int:
         """Получение периода в днях для типа подписки"""
