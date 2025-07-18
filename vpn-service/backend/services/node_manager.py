@@ -274,7 +274,7 @@ class NodeManager:
             result = await self.db.execute(
                 select(func.count(VPNKey.id))
                 .where(VPNKey.node_id == node_id)
-                .where(VPNKey.status == VPNKeyStatus.ACTIVE.value)
+                .where(VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value]))
             )
             current_users = result.scalar() or 0
             

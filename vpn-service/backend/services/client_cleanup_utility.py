@@ -70,7 +70,7 @@ class ClientCleanupUtility:
     async def get_active_keys_from_db(self) -> List[VPNKey]:
         """Получение списка активных ключей из базы данных"""
         key_result = await self.session.execute(
-            select(VPNKey).where(VPNKey.status == VPNKeyStatus.ACTIVE.value)
+            select(VPNKey).where(VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value]))
         )
         return list(key_result.scalars().all())
     

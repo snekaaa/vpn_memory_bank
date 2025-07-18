@@ -160,7 +160,7 @@ class VPNManagerX3UI:
             if dashboard_result and dashboard_result.get("success"):
                 # Пользователь существует, проверяем активные ключи
                 vpn_keys = dashboard_result.get("vpn_keys", [])
-                active_keys = [key for key in vpn_keys if key.get("status") == "ACTIVE"]
+                active_keys = [key for key in vpn_keys if key.get("status") in ["active", "ACTIVE"]]
                 
                 if active_keys:
                     # Есть активный ключ - возвращаем последний

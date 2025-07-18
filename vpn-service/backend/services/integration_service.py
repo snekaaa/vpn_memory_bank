@@ -340,10 +340,11 @@ class IntegrationService:
                 from models.vpn_key import VPNKeyStatus
                 
                 # Получаем VPN ключи (сортируем по ID в убывающем порядке - новые первыми)
+                # ИСПРАВЛЕНИЕ: Поиск ключей по различным вариантам статуса
                 vpn_keys_result = await session.execute(
                     select(VPNKey).where(
                         VPNKey.user_id == user.id,
-                        VPNKey.status == VPNKeyStatus.ACTIVE.value
+                        VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value])
                     ).order_by(VPNKey.id.desc())
                 )
                 vpn_keys = vpn_keys_result.scalars().all()
@@ -478,7 +479,7 @@ class IntegrationService:
                 current_key_result = await session.execute(
                     select(VPNKey).where(
                         VPNKey.user_id == user_id,
-                        VPNKey.status == VPNKeyStatus.ACTIVE.value
+                        VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value])
                     ).order_by(VPNKey.created_at.desc()).limit(1)
                 )
                 current_key = current_key_result.scalar_one_or_none()
@@ -666,7 +667,7 @@ class IntegrationService:
                 old_active_keys_result = await session.execute(
                     select(VPNKey).where(
                         VPNKey.user_id == user_id,
-                        VPNKey.status == VPNKeyStatus.ACTIVE.value
+                        VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value])
                     )
                 )
                 old_active_keys = old_active_keys_result.scalars().all()

@@ -80,7 +80,7 @@ class SimpleKeyUpdateService:
                 active_key_result = await session.execute(
                     select(VPNKey).where(
                         VPNKey.user_id == user_id,
-                        VPNKey.status == VPNKeyStatus.ACTIVE.value
+                        VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value])
                     ).order_by(VPNKey.created_at.desc()).limit(1)
                 )
                 active_key = active_key_result.scalar_one_or_none()
@@ -289,7 +289,7 @@ class SimpleKeyUpdateService:
             key_result = await session.execute(
                 select(VPNKey).where(
                     VPNKey.user_id == user_id,
-                    VPNKey.status == VPNKeyStatus.ACTIVE.value
+                    VPNKey.status.in_(["active", "ACTIVE", VPNKeyStatus.ACTIVE.value])
                 ).order_by(VPNKey.created_at.desc()).limit(1)
             )
             key = key_result.scalar_one_or_none()
