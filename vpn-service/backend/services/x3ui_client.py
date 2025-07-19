@@ -528,53 +528,186 @@ class X3UIClient:
                        error=str(e))
             return False
     
-    async def get_client_stats(self, inbound_id: int, client_id: str) -> Optional[Dict]:
+    async def get_client_stats(self, email: str = None) -> Optional[Dict[str, Any]]:
         """Получение статистики клиента"""
         try:
-            # Получаем статистику по inbound
-            result = await self._make_request("GET", f"/panel/api/inbounds/get/{inbound_id}")
-            
-            if result and result.get("success"):
-                inbound_data = result.get("obj")
-                if inbound_data:
-                    # Парсим настройки клиентов
-                    settings = json.loads(inbound_data.get("settings", "{}"))
-                    clients = settings.get("clients", [])
-                    
-                    # Ищем нужного клиента
-                    for client in clients:
-                        if client.get("id") == client_id:
-                            # Получаем статистику трафика
-                            client_stats = inbound_data.get("clientStats") or []  # Обработка None
-                            stats = {}
-                            if client_stats:  # Дополнительная проверка
-                                stats = next((s for s in client_stats if s.get("email") == client.get("email")), {})
-                            
-                            # Рассчитываем общий трафик
-                            up_traffic = stats.get("up", 0)
-                            down_traffic = stats.get("down", 0)
-                            total_traffic = up_traffic + down_traffic
-                            
-                            return {
-                                "client_id": client_id,
-                                "email": client.get("email"),
-                                "enabled": client.get("enable", False),
-                                "total_gb": client.get("totalGB", 0),
-                                "expiry_time": client.get("expiryTime", 0),
-                                "up_traffic": up_traffic,
-                                "down_traffic": down_traffic,
-                                "total_traffic": total_traffic,
-                                "enable": client.get("enable", False)
-                            }
-                
-                logger.warning("Client not found in 3xui stats", client_id=client_id, inbound_id=inbound_id)
+            if not await self._ensure_session():
                 return None
+            
+            endpoint = "/panel/api/inbounds/onlines"
+            if email:
+                endpoint = f"/panel/api/inbounds/getClientTraffics/{email}"
                 
+            result = await self._make_request("GET", endpoint)
+            return result
+            
         except Exception as e:
-            logger.error("Error getting client stats", 
-                        client_id=client_id, 
-                        inbound_id=inbound_id,
+            logger.error("Error getting client stats", email=email, error=str(e))
+            return None
+
+    async def enable_client_by_email(self, email: str) -> bool:
+        """Включить клиента в X3UI панели по email"""
+        return await self._toggle_client_status(email, enable=True)
+
+    async def disable_client_by_email(self, email: str) -> bool:
+        """Отключить клиента в X3UI панели по email"""
+        return await self._toggle_client_status(email, enable=False)
+
+    async def _toggle_client_status(self, email: str, enable: bool) -> bool:
+        """Переключить статус клиента (enable/disable)"""
+        try:
+            if not await self._ensure_session():
+                logger.error("Cannot toggle client status - no session", email=email)
+                return False
+            
+            action = "enable" if enable else "disable"
+            logger.info(f"Attempting to {action} client", email=email)
+            
+            # Получаем все inbound'ы
+            inbounds = await self.get_inbounds()
+            if not inbounds:
+                logger.error("No inbounds available for client status toggle", email=email)
+                return False
+            
+            # Ищем клиента во всех inbound'ах
+            for inbound in inbounds:
+                settings = inbound.get("settings", "{}")
+                if isinstance(settings, str):
+                    try:
+                        settings = json.loads(settings)
+                    except json.JSONDecodeError:
+                        logger.warning("Invalid JSON in inbound settings", inbound_id=inbound.get("id"))
+                        continue
+                
+                clients = settings.get("clients", [])
+                client_found = False
+                
+                # Ищем нужного клиента
+                for i, client in enumerate(clients):
+                    if client.get("email") == email:
+                        client_found = True
+                        
+                        # Проверяем текущий статус
+                        current_status = client.get("enable", False)
+                        if current_status == enable:
+                            logger.info(f"Client already in desired state", 
+                                       email=email, 
+                                       current_enable=current_status, 
+                                       target_enable=enable)
+                            return True
+                        
+                        # Изменяем статус клиента
+                        clients[i]["enable"] = enable
+                        
+                        # Обновляем настройки inbound'а
+                        updated_settings = settings.copy()
+                        updated_settings["clients"] = clients
+                        
+                        # Подготавливаем данные для обновления inbound'а
+                        update_data = {
+                            "id": inbound["id"],
+                            "remark": inbound.get("remark", ""),
+                            "listen": inbound.get("listen", ""),
+                            "port": inbound.get("port", 443),
+                            "protocol": inbound.get("protocol", "vless"),
+                            "settings": json.dumps(updated_settings),
+                            "streamSettings": json.dumps(inbound.get("streamSettings", {})),
+                            "sniffing": json.dumps(inbound.get("sniffing", {}))
+                        }
+                        
+                        # Отправляем запрос на обновление
+                        update_result = await self._make_request(
+                            "POST", 
+                            f"/panel/api/inbounds/update/{inbound['id']}", 
+                            update_data
+                        )
+                        
+                        if update_result and update_result.get("success"):
+                            logger.info(f"✅ Client {action}d successfully", 
+                                       email=email,
+                                       inbound_id=inbound["id"],
+                                       new_status=enable)
+                            
+                            # Проверяем результат (небольшая задержка для обновления)
+                            await asyncio.sleep(0.5)
+                            verification_result = await self._verify_client_status(email, enable)
+                            
+                            if verification_result:
+                                logger.info(f"✅ Client status verified", email=email, enable=enable)
+                                return True
+                            else:
+                                logger.warning(f"⚠️ Client status change successful but verification failed", 
+                                             email=email, enable=enable)
+                                return True  # Считаем успешным, так как API вернул success
+                        else:
+                            error_msg = update_result.get("msg") if update_result else "No response"
+                            logger.error(f"❌ Failed to {action} client", 
+                                       email=email,
+                                       error=error_msg)
+                            return False
+                        
+                        break  # Клиент найден и обработан
+                
+                if client_found:
+                    break  # Не нужно искать в других inbound'ах
+            
+            if not client_found:
+                logger.warning(f"Client not found for {action}", email=email)
+                return False
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error during client {action if 'enable' in locals() else 'toggle'}", 
+                        email=email, 
                         error=str(e))
+            return False
+
+    async def _verify_client_status(self, email: str, expected_enable: bool) -> bool:
+        """Проверить статус клиента после изменения"""
+        try:
+            inbounds = await self.get_inbounds()
+            if not inbounds:
+                return False
+            
+            for inbound in inbounds:
+                settings = json.loads(inbound.get("settings", "{}"))
+                clients = settings.get("clients", [])
+                
+                for client in clients:
+                    if client.get("email") == email:
+                        actual_enable = client.get("enable", False)
+                        return actual_enable == expected_enable
+            
+            return False
+            
+        except Exception as e:
+            logger.error("Error verifying client status", email=email, error=str(e))
+            return False
+
+    async def get_client_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Получить информацию о клиенте по email"""
+        try:
+            inbounds = await self.get_inbounds()
+            if not inbounds:
+                return None
+            
+            for inbound in inbounds:
+                settings = json.loads(inbound.get("settings", "{}"))
+                clients = settings.get("clients", [])
+                
+                for client in clients:
+                    if client.get("email") == email:
+                        # Добавляем информацию об inbound'е
+                        client_info = client.copy()
+                        client_info["inbound_id"] = inbound.get("id")
+                        client_info["inbound_remark"] = inbound.get("remark")
+                        return client_info
+            
+            return None
+            
+        except Exception as e:
+            logger.error("Error getting client by email", email=email, error=str(e))
             return None
     
     async def generate_client_url(self, inbound_id: int, client_id: str) -> Optional[str]:

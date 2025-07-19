@@ -58,6 +58,29 @@ async def start_command(message: types.Message, state: FSMContext):
         except:
             await message.answer("⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
 
+@start_router.message(F.text == "🔐 Получить VPN доступ")
+async def get_vpn_access_handler(message: types.Message):
+    """Обработчик кнопки 'Получить VPN доступ' - показывает планы подписки"""
+    try:
+        telegram_id = message.from_user.id
+        logger.info("User requested VPN access (no subscription)", telegram_id=telegram_id)
+        
+        # Показываем планы подписки
+        from keyboards.main_menu import get_subscription_keyboard_with_autopay
+        
+        subscription_keyboard = await get_subscription_keyboard_with_autopay()
+        
+        await message.answer(
+            "🔐 **VPN доступ требует активную подписку**\n\n"
+            "Выберите подходящий план подписки для получения доступа к VPN ключам:",
+            reply_markup=subscription_keyboard,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error("Error in get_vpn_access_handler", error=str(e))
+        await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
+
 @start_router.message(F.text == "🔑 Мой VPN ключ")
 async def vpn_key_handler(message: types.Message):
     """Обработчик кнопки 'Мой VPN ключ' - сразу показывает ключ"""

@@ -293,12 +293,16 @@ async def get_user_subscription_days(telegram_id: int) -> int:
 async def send_main_menu(message, telegram_id, text="🏠 Главное меню"):
     """Универсальный хелпер для отправки главного меню с актуальным количеством дней подписки"""
     days_remaining = await get_user_subscription_days(telegram_id)
+    
+    # Определяем есть ли активная подписка
+    has_active_subscription = days_remaining > 0
+    
     await message.answer(
         text,
-        reply_markup=get_main_menu(days_remaining)
+        reply_markup=get_main_menu(days_remaining, has_active_subscription)
     )
 
-def get_main_menu(days_remaining: int = 0) -> ReplyKeyboardMarkup:
+def get_main_menu(days_remaining: int = 0, has_active_subscription: bool = True) -> ReplyKeyboardMarkup:
     """Главное меню с кнопками для быстрого доступа"""
     
     # Формируем текст кнопки подписки в зависимости от количества дней
@@ -307,12 +311,21 @@ def get_main_menu(days_remaining: int = 0) -> ReplyKeyboardMarkup:
     else:
         subscription_text = "💳 Подписка"
     
+    # Первая строка кнопок - условно показываем VPN кнопку
+    first_row = []
+    
+    if has_active_subscription:
+        # Пользователь с активной подпиской - показываем кнопку VPN ключа
+        first_row.append(KeyboardButton(text="🔑 Мой VPN ключ"))
+    else:
+        # Пользователь без подписки - показываем кнопку получения доступа
+        first_row.append(KeyboardButton(text="🔐 Получить VPN доступ"))
+    
+    first_row.append(KeyboardButton(text=subscription_text))
+    
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text="🔑 Мой VPN ключ"),
-                KeyboardButton(text=subscription_text)
-            ],
+            first_row,
             [
                 KeyboardButton(text="📱 Приложения"),
                 KeyboardButton(text="🧑🏼‍💻 Служба поддержки")

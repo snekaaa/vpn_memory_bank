@@ -608,7 +608,7 @@ async def get_vpn_keys_paginated(db: AsyncSession, page: int = 1, size: int = 50
     count_query = select(func.count(VPNKey.id))
     
     # Фильтр по статусу
-    if status and status in ["active", "inactive", "expired", "revoked"]:
+    if status and status in ["active", "inactive", "suspended", "expired", "revoked"]:
         status_filter = VPNKey.status == status
         base_query = base_query.where(status_filter)
         count_query = count_query.where(status_filter)

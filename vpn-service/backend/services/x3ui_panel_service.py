@@ -378,6 +378,85 @@ class X3UIPanelService:
             logger.error("Error disabling client", email=email, error=str(e))
             return False
 
+    async def enable_client_by_email(self, email: str) -> bool:
+        """Включить клиента в X3UI панели по email"""
+        try:
+            if not await self.login():
+                return False
+                
+            session = await self._get_session()
+            
+            # Находим клиента во всех inbound'ах
+            async with session.get(f"{self.base_url}/panel/api/inbounds/list") as response:
+                if response.status != 200:
+                    return False
+                    
+                data = await response.json()
+                if not data.get("success"):
+                    return False
+                
+                inbounds = data.get("obj", [])
+                
+                for inbound in inbounds:
+                    settings = inbound.get("settings", "{}")
+                    if isinstance(settings, str):
+                        try:
+                            settings = json.loads(settings)
+                        except:
+                            continue
+                    
+                    clients = settings.get("clients", [])
+                    
+                    for i, client in enumerate(clients):
+                        if client.get("email") == email:
+                            # Найден! Включаем (enable)
+                            client["enable"] = True
+                            
+                            # Обновляем настройки inbound'а
+                            updated_settings = {
+                                "clients": clients
+                            }
+                            
+                            update_data = {
+                                "id": inbound["id"],
+                                "settings": json.dumps(updated_settings),
+                                "remark": inbound.get("remark", ""),
+                                "protocol": inbound.get("protocol", ""),
+                                "port": inbound.get("port", 443),
+                                "listen": inbound.get("listen", ""),
+                                "sniffing": json.dumps(inbound.get("sniffing", {})),
+                                "streamSettings": json.dumps(inbound.get("streamSettings", {}))
+                            }
+                            
+                            async with session.post(
+                                f"{self.base_url}/panel/api/inbounds/update/{inbound['id']}",
+                                data=update_data
+                            ) as update_response:
+                                if update_response.status == 200:
+                                    result = await update_response.json()
+                                    if result.get("success"):
+                                        logger.info("✅ Client successfully enabled in X3UI panel",
+                                                  email=email,
+                                                  inbound_id=inbound["id"])
+                                        return True
+                                    else:
+                                        logger.error("Failed to enable client",
+                                                   email=email,
+                                                   result=result)
+                                        return False
+                                else:
+                                    logger.error("Failed to update inbound for client enable",
+                                               email=email,
+                                               status=update_response.status)
+                                    return False
+                
+                logger.warning("Client not found for enable", email=email)
+                return False
+                
+        except Exception as e:
+            logger.error("Error enabling client", email=email, error=str(e))
+            return False
+
     async def delete_client_by_email(self, email: str) -> bool:
         """Удалить клиента из X3UI панели по email с проверкой результата"""
         try:

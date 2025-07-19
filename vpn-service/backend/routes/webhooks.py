@@ -17,6 +17,7 @@ from models.user import User
 from models.vpn_key import VPNKey
 from services.x3ui_client import x3ui_client
 from services.notification_service import notification_service
+from services.vpn_key_lifecycle_service import VPNKeyLifecycleService
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 logger = structlog.get_logger(__name__)
@@ -339,6 +340,30 @@ async def _activate_subscription(subscription: Subscription, db: AsyncSession):
                subscription_id=subscription.id,
                type=subscription.subscription_type.value,
                end_date=end_date.isoformat())
+    
+    # НОВОЕ: Реактивируем VPN ключи пользователя при активации подписки
+    try:
+        lifecycle_service = VPNKeyLifecycleService(db)
+        reactivation_result = await lifecycle_service.reactivate_user_keys(subscription.user_id)
+        
+        if reactivation_result.get("success"):
+            reactivated_count = reactivation_result.get("reactivated_count", 0)
+            logger.info("✅ VPN keys reactivated after subscription activation", 
+                       user_id=subscription.user_id,
+                       subscription_id=subscription.id,
+                       reactivated_keys=reactivated_count)
+        else:
+            logger.warning("⚠️ Failed to reactivate VPN keys after subscription activation", 
+                         user_id=subscription.user_id,
+                         subscription_id=subscription.id,
+                         error=reactivation_result.get("error"))
+                         
+    except Exception as e:
+        logger.error("💥 Error reactivating VPN keys after subscription activation", 
+                    user_id=subscription.user_id,
+                    subscription_id=subscription.id,
+                    error=str(e))
+        # Не прерываем процесс активации подписки из-за проблем с ключами
 
 async def _create_vpn_key_for_subscription(subscription: Subscription, db: AsyncSession):
     """Создание VPN ключа для активированной подписки"""

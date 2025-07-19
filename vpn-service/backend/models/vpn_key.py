@@ -8,6 +8,7 @@ class VPNKeyStatus(str, enum.Enum):
     """Статусы VPN ключа"""
     ACTIVE = "active"
     INACTIVE = "inactive"
+    SUSPENDED = "suspended"
     EXPIRED = "expired"
     REVOKED = "revoked"
 

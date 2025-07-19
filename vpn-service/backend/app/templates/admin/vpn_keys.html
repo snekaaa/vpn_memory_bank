@@ -24,8 +24,7 @@
                     <option value="">Все статусы</option>
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
                     <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Неактивные</option>
-                    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Истекшие</option>
-                    <option value="revoked" {% if status_filter == 'revoked' %}selected{% endif %}>Отозванные</option>
+                    <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Приостановленные</option>
                 </select>
             </div>
             <div class="col-md-4">
@@ -118,10 +117,12 @@
                         <span class="badge bg-success">Активен</span>
                         {% elif key.status == 'inactive' %}
                         <span class="badge bg-secondary">Неактивен</span>
-                        {% elif key.status == 'expired' %}
-                        <span class="badge bg-warning">Истёк</span>
-                        {% elif key.status == 'revoked' %}
-                        <span class="badge bg-danger">Отозван</span>
+                        {% elif key.status == 'suspended' %}
+                        <span class="badge bg-warning">Приостановлен</span>
+                        {% elif key.status %}
+                        <span class="badge bg-light text-dark">{{ key.status|title }}</span>
+                        {% else %}
+                        <span class="badge bg-light text-muted">Не указан</span>
                         {% endif %}
                     </td>
                     <td>
@@ -155,10 +156,12 @@
                     <span class="badge bg-success">Активен</span>
                     {% elif key.status == 'inactive' %}
                     <span class="badge bg-secondary">Неактивен</span>
-                    {% elif key.status == 'expired' %}
-                    <span class="badge bg-warning">Истёк</span>
-                    {% elif key.status == 'revoked' %}
-                    <span class="badge bg-danger">Отозван</span>
+                    {% elif key.status == 'suspended' %}
+                    <span class="badge bg-warning">Приостановлен</span>
+                    {% elif key.status %}
+                    <span class="badge bg-light text-dark">{{ key.status|title }}</span>
+                    {% else %}
+                    <span class="badge bg-light text-muted">Не указан</span>
                     {% endif %}
                 </div>
             </div>
