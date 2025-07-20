@@ -101,13 +101,30 @@ async def vpn_key_handler(message: types.Message):
             vpn_key_data = await vpn_manager.get_or_create_user_key(telegram_id, username, first_name)
             
             if vpn_key_data and vpn_key_data.get('vless_url'):
-                # Отправляем сообщение с ключом
-                message_text = get_vpn_key_message(vpn_key_data['vless_url'], is_update=False)
+                # Используем расширенное сообщение с информацией о сервере
+                try:
+                    from handlers.vpn_simplified import enhance_vpn_key_message
+                    message_text, keyboard = await enhance_vpn_key_message(
+                        vpn_key_data['vless_url'], 
+                        telegram_id, 
+                        is_update=False
+                    )
+                except Exception as e:
+                    # Fallback к базовому шаблону с сервером
+                    from templates.messages import get_vpn_key_message_with_server
+                    from handlers.vpn_simplified import DEMO_COUNTRIES
+                    default_country = DEMO_COUNTRIES[0]  # Нидерланды
+                    message_text = get_vpn_key_message_with_server(
+                        vpn_key_data['vless_url'], 
+                        default_country, 
+                        is_update=False
+                    )
+                    keyboard = get_main_menu_keyboard()
                 
                 await loading_msg.edit_text(
                     message_text,
                     parse_mode="Markdown",
-                    reply_markup=get_main_menu_keyboard()
+                    reply_markup=keyboard
                 )
                 
                 logger.info("VPN key provided to user", 

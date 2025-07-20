@@ -26,6 +26,12 @@ from models.payment_provider import (
     PaymentProvider, PaymentProviderType, PaymentProviderStatus
 )
 from models.auto_payment import AutoPayment
+# NEW: Country management imports
+from models.country import Country
+from models.user_server_assignment import UserServerAssignment
+from models.server_switch_log import ServerSwitchLog
+from services.country_service import CountryService
+from services.user_server_service import UserServerService
 from services.x3ui_client import x3ui_client
 from services.node_manager import NodeManager, NodeConfig
 from services.load_balancer import LoadBalancer
@@ -74,7 +80,7 @@ from services.node_automation import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # Настройка templates
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory=["app/templates"])
 
 # Настройка логгера
 logger = structlog.get_logger(__name__)
@@ -993,47 +999,70 @@ async def admin_node_detail_page(
 ):
     """Детальная страница ноды"""
     
-    # Инициализируем NodeManager
-    node_manager = NodeManager(db)
-    
-    # Получаем ноду
-    node = await node_manager.get_node_by_id(node_id)
-    
-    if not node:
-        return RedirectResponse(url="/admin/nodes", status_code=302)
-    
-    # Получаем пользователей на этой ноде
-    result = await db.execute(
-        select(User)
-        .join(UserNodeAssignment)
-        .where(UserNodeAssignment.node_id == node_id)
-        .where(UserNodeAssignment.is_active == True)
-        .order_by(User.created_at.desc())
-    )
-    users = result.scalars().all()
-    
     try:
-        # Пробуем сначала новый шаблон
+        # Получаем ноду напрямую из БД
+        node_result = await db.execute(
+            select(VPNNode).where(VPNNode.id == node_id)
+        )
+        node = node_result.scalar_one_or_none()
+        
+        if not node:
+            logger.warning("Node not found", node_id=node_id)
+            return RedirectResponse(url="/admin/nodes", status_code=302)
+        
+        # Получаем пользователей на этой ноде
+        try:
+            result = await db.execute(
+                select(User)
+                .join(UserServerAssignment, User.telegram_id == UserServerAssignment.user_id)
+                .where(UserServerAssignment.node_id == node_id)
+                .order_by(User.created_at.desc())
+            )
+            users = result.scalars().all()
+        except Exception as user_error:
+            logger.warning("Error loading users for node", node_id=node_id, error=str(user_error))
+            users = []
+        
+        logger.info("Loading node view page", node_id=node_id, node_name=node.name, users_count=len(users))
+        
+        # Преобразуем ноду в словарь чтобы избежать ленивой загрузки в шаблоне  
+        node_dict = {
+            "id": node.id,
+            "name": node.name,
+            "location": node.location,
+            "status": node.status,
+            "priority": node.priority,
+            "x3ui_url": node.x3ui_url,
+            "x3ui_username": node.x3ui_username,
+            "x3ui_password": node.x3ui_password,
+            "description": node.description,
+            "weight": node.weight,
+            "response_time_ms": node.response_time_ms,
+            "created_at": node.created_at,
+            "updated_at": node.updated_at,
+            "last_health_check": node.last_health_check,
+            "health_status": getattr(node, 'health_status', 'unknown'),
+            "current_users": getattr(node, 'current_users', 0),
+            "max_users": getattr(node, 'max_users', 1000),
+            # Вычисляем load_percentage заранее
+            "load_percentage": (getattr(node, 'current_users', 0) / getattr(node, 'max_users', 1000)) * 100 if getattr(node, 'max_users', 1000) > 0 else 0,
+            # Убираем user_assignments чтобы избежать ленивой загрузки
+            "user_assignments": []
+        }
+        
+        # Отображаем шаблон
         return templates.TemplateResponse("admin/nodes/view.html", {
             "request": request,
             "title": f"Node: {node.name}",
             "current_admin": current_admin,
-            "node": node,
+            "node": node_dict,
             "users": users
         })
-    except Exception:
-        # При ошибке используем старый шаблон (если существует) или перенаправляем
-        try:
-            return templates.TemplateResponse("admin/node_view.html", {
-                "request": request,
-                "title": f"Node: {node.name}",
-                "current_admin": current_admin,
-                "node": node,
-                "users": users
-            })
-        except Exception:
-            # Если и старый шаблон отсутствует, перенаправляем на список нод
-            return RedirectResponse(url="/admin/nodes", status_code=302)
+        
+    except Exception as e:
+        logger.error("Error loading node view page", node_id=node_id, error=str(e))
+        # При ошибке перенаправляем на список нод
+        return RedirectResponse(url="/admin/nodes", status_code=302)
 
 @router.get("/nodes/{node_id}/node_dashboard")
 async def admin_node_client_dashboard(
@@ -1085,12 +1114,17 @@ async def admin_edit_node_page(
         return RedirectResponse(url="/admin/nodes", status_code=302)
     
     try:
+        # Получаем список стран для выпадающего списка
+        countries_result = await db.execute(select(Country).order_by(Country.priority.desc(), Country.name))
+        countries = countries_result.scalars().all()
+        
         # Пробуем сначала новый шаблон
         return templates.TemplateResponse("admin/nodes/edit.html", {
             "request": request,
             "title": f"Edit Node: {node.name}",
             "current_admin": current_admin,
-            "node": node
+            "node": node,
+            "countries": countries  # NEW: Передаем страны в template
         })
     except Exception:
         # При ошибке используем старый шаблон если он существует
@@ -1111,6 +1145,7 @@ async def admin_update_node(
     priority: int = Form(100),
     weight: float = Form(1.0),
     status: str = Form("active"),
+    country_id: Optional[int] = Form(None),  # NEW: Country assignment
     current_admin: str = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -1130,7 +1165,8 @@ async def admin_update_node(
         "max_users": max_users,
         "priority": priority,
         "weight": weight,
-        "status": status
+        "status": status,
+        "country_id": country_id if country_id else None  # NEW: Add country assignment
     }
     
     # Обновляем ноду
@@ -1415,9 +1451,8 @@ async def admin_node_users_page(
     
     users_query = (
         select(User)
-        .join(UserNodeAssignment)
-        .where(UserNodeAssignment.node_id == node_id)
-        .where(UserNodeAssignment.is_active == True)
+        .join(UserServerAssignment, User.telegram_id == UserServerAssignment.user_id)
+        .where(UserServerAssignment.node_id == node_id)
         .order_by(User.created_at.desc())
         .offset(offset)
         .limit(size)
@@ -1425,9 +1460,8 @@ async def admin_node_users_page(
     
     count_query = (
         select(func.count(User.id))
-        .join(UserNodeAssignment)
-        .where(UserNodeAssignment.node_id == node_id)
-        .where(UserNodeAssignment.is_active == True)
+        .join(UserServerAssignment, User.telegram_id == UserServerAssignment.user_id)
+        .where(UserServerAssignment.node_id == node_id)
     )
     
     users_result = await db.execute(users_query)
@@ -2930,3 +2964,329 @@ async def _get_payment_provider_dashboard_stats(db: AsyncSession) -> PaymentProv
         total_amount_today=total_amount_today,
         success_rate_today=success_rate_today
     )
+
+
+# NEW: Country Management Routes
+
+@router.get("/countries", response_class=HTMLResponse)
+async def admin_countries_page(
+    request: Request,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Страница управления странами VPN серверов"""
+    try:
+        country_service = CountryService(db)
+        
+        # Получаем все страны (включая неактивные)
+        result = await db.execute(select(Country).order_by(Country.priority.desc(), Country.name))
+        countries = result.scalars().all()
+        
+        # Получаем статистику по каждой стране
+        countries_stats = []
+        for country in countries:
+            # Получаем ноды для страны
+            nodes = await country_service.get_nodes_by_country(country.id)
+            
+            # Подсчитываем статистику
+            total_nodes = len(nodes)
+            healthy_nodes = len([n for n in nodes if n.is_healthy])
+            total_capacity = sum(n.max_users for n in nodes)
+            current_users = sum(n.current_users for n in nodes)
+            
+            # Получаем количество назначений пользователей
+            assignments_result = await db.execute(
+                select(func.count(UserServerAssignment.user_id)).where(
+                    UserServerAssignment.country_id == country.id
+                )
+            )
+            user_assignments = assignments_result.scalar() or 0
+            
+            countries_stats.append({
+                "country": country,
+                "total_nodes": total_nodes,
+                "healthy_nodes": healthy_nodes,
+                "total_capacity": total_capacity,
+                "current_users": current_users,
+                "user_assignments": user_assignments,
+                "load_percentage": (current_users / total_capacity * 100) if total_capacity > 0 else 0
+            })
+        
+        return templates.TemplateResponse(
+            "admin/countries/list.html",
+            {
+                "request": request,
+                "countries_stats": countries_stats,
+                "title": "Управление странами"
+            }
+        )
+        
+    except Exception as e:
+        logger.error("Error loading countries page", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки: {str(e)}")
+
+
+@router.get("/countries/{country_id}/nodes", response_class=HTMLResponse)
+async def admin_country_nodes_page(
+    country_id: int,
+    request: Request,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Страница управления нодами в стране"""
+    try:
+        country_service = CountryService(db)
+        
+        # Получаем страну
+        country = await country_service.get_country_by_id(country_id)
+        if not country:
+            raise HTTPException(status_code=404, detail="Страна не найдена")
+        
+        # Получаем ноды для страны
+        country_nodes = await country_service.get_nodes_by_country(country_id)
+        
+        # Получаем все ноды без страны для возможности назначения
+        unassigned_nodes_result = await db.execute(
+            select(VPNNode).where(VPNNode.country_id.is_(None))
+        )
+        unassigned_nodes = unassigned_nodes_result.scalars().all()
+        
+        return templates.TemplateResponse(
+            "admin/countries/nodes.html",
+            {
+                "request": request,
+                "country": country,
+                "country_nodes": country_nodes,
+                "unassigned_nodes": unassigned_nodes,
+                "title": f"Ноды страны {country.name}"
+            }
+        )
+        
+    except Exception as e:
+        logger.error("Error loading country nodes page", country_id=country_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки: {str(e)}")
+
+
+@router.post("/countries/{country_id}/assign-node/{node_id}")
+async def assign_node_to_country(
+    country_id: int,
+    node_id: int,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Назначить ноду на страну"""
+    try:
+        # Проверяем существование страны и ноды
+        country = await db.get(Country, country_id)
+        node = await db.get(VPNNode, node_id)
+        
+        if not country:
+            raise HTTPException(status_code=404, detail="Страна не найдена")
+        if not node:
+            raise HTTPException(status_code=404, detail="Нода не найдена")
+        
+        # Назначаем ноду на страну
+        node.country_id = country_id
+        await db.commit()
+        
+        logger.info("Node assigned to country", 
+                   node_id=node_id, 
+                   country_id=country_id,
+                   admin=current_admin)
+        
+        return RedirectResponse(
+            url=f"/admin/countries/{country_id}/nodes",
+            status_code=303
+        )
+        
+    except Exception as e:
+        logger.error("Error assigning node to country", 
+                    node_id=node_id, 
+                    country_id=country_id, 
+                    error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка назначения: {str(e)}")
+
+
+@router.post("/countries/{country_id}/unassign-node/{node_id}")
+async def unassign_node_from_country(
+    country_id: int,
+    node_id: int,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Отменить назначение ноды от страны"""
+    try:
+        node = await db.get(VPNNode, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Нода не найдена")
+        
+        # Убираем назначение
+        node.country_id = None
+        await db.commit()
+        
+        logger.info("Node unassigned from country", 
+                   node_id=node_id, 
+                   country_id=country_id,
+                   admin=current_admin)
+        
+        return RedirectResponse(
+            url=f"/admin/countries/{country_id}/nodes",
+            status_code=303
+        )
+        
+    except Exception as e:
+        logger.error("Error unassigning node from country", 
+                    node_id=node_id, 
+                    country_id=country_id, 
+                    error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка отмены назначения: {str(e)}")
+
+
+@router.get("/countries/logs", response_class=HTMLResponse)
+async def admin_country_switch_logs(
+    request: Request,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Страница логов переключения серверов"""
+    try:
+        # Получаем последние 100 логов переключений
+        result = await db.execute(
+            select(ServerSwitchLog)
+            .order_by(ServerSwitchLog.created_at.desc())
+            .limit(100)
+        )
+        switch_logs = result.scalars().all()
+        
+        # Получаем информацию о нодах для логов
+        logs_with_details = []
+        for log in switch_logs:
+            from_node = None
+            to_node = None
+            
+            if log.from_node_id:
+                from_node = await db.get(VPNNode, log.from_node_id)
+            if log.to_node_id:
+                to_node = await db.get(VPNNode, log.to_node_id)
+            
+            logs_with_details.append({
+                "log": log,
+                "from_node": from_node,
+                "to_node": to_node
+            })
+        
+        return templates.TemplateResponse(
+            "admin/countries/switch_logs.html",
+            {
+                "request": request,
+                "logs_with_details": logs_with_details,
+                "title": "Логи переключения серверов"
+            }
+        )
+        
+    except Exception as e:
+        logger.error("Error loading switch logs page", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки: {str(e)}")
+
+
+@router.get("/api/countries/stats")
+async def api_countries_stats(
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """API для получения статистики стран"""
+    try:
+        country_service = CountryService(db)
+        countries = await country_service.get_available_countries()
+        
+        stats = []
+        for country in countries:
+            nodes = await country_service.get_nodes_by_country(country.id)
+            
+            total_nodes = len(nodes)
+            healthy_nodes = len([n for n in nodes if n.is_healthy])
+            total_capacity = sum(n.max_users for n in nodes)
+            current_users = sum(n.current_users for n in nodes)
+            
+            stats.append({
+                "country": country.to_dict(),
+                "nodes_total": total_nodes,
+                "nodes_healthy": healthy_nodes,
+                "total_capacity": total_capacity,
+                "current_users": current_users,
+                "load_percentage": (current_users / total_capacity * 100) if total_capacity > 0 else 0
+            })
+        
+        return {"countries": stats}
+        
+    except Exception as e:
+        logger.error("Error getting countries stats", error=str(e))
+        return {"error": str(e)}
+
+
+@router.get("/countries/create", response_class=HTMLResponse)
+async def admin_create_country_form(
+    request: Request,
+    current_admin: str = Depends(get_current_admin)
+):
+    """Форма создания новой страны"""
+    return templates.TemplateResponse(
+        "admin/countries/create.html",
+        {
+            "request": request,
+            "title": "Добавить страну"
+        }
+    )
+
+
+@router.post("/countries/create")
+async def admin_create_country(
+    request: Request,
+    code: str = Form(...),
+    name: str = Form(...),
+    name_en: str = Form(""),
+    flag_emoji: str = Form(...),
+    priority: int = Form(100),
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Создание новой страны"""
+    try:
+        # Проверяем что код страны уникален
+        existing_country = await db.execute(select(Country).where(Country.code == code.upper()))
+        if existing_country.scalar_one_or_none():
+            return templates.TemplateResponse(
+                "admin/countries/create.html",
+                {
+                    "request": request,
+                    "title": "Добавить страну",
+                    "error": f"Страна с кодом {code.upper()} уже существует"
+                }
+            )
+        
+        # Создаем новую страну
+        new_country = Country(
+            code=code.upper(),
+            name=name,
+            name_en=name_en or name,
+            flag_emoji=flag_emoji,
+            priority=priority,
+            is_active=True
+        )
+        
+        db.add(new_country)
+        await db.commit()
+        
+        logger.info("Country created successfully", country_code=code, name=name)
+        return RedirectResponse(url="/admin/countries", status_code=303)
+        
+    except Exception as e:
+        logger.error("Error creating country", error=str(e))
+        return templates.TemplateResponse(
+            "admin/countries/create.html",
+            {
+                "request": request,
+                "title": "Добавить страну",
+                "error": f"Ошибка создания страны: {str(e)}"
+            }
+        )

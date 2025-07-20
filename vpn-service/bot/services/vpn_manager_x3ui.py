@@ -145,6 +145,119 @@ class VPNManagerX3UI:
                         error=str(e))
             return {"success": False, "error": str(e)}
 
+    async def create_key_for_user_country(self, telegram_id: int, username: str = "", first_name: str = "") -> Dict:
+        """Создать VPN ключ для пользователя с учетом назначенной страны"""
+        try:
+            logger.info("🌍 Creating VPN key for user country", 
+                       telegram_id=telegram_id)
+            
+            # Используем новый API endpoint
+            result = await self._make_request(
+                "POST",
+                f"/api/v1/vpn-keys/user/{telegram_id}/create-for-country"
+            )
+            
+            if result and result.get("success"):
+                vpn_key = result.get("vpn_key", {})
+                
+                logger.info("✅ Created key for user country", 
+                           telegram_id=telegram_id,
+                           key_id=vpn_key.get("id"),
+                           node_id=vpn_key.get("node_id"),
+                           country=vpn_key.get("country"))
+                
+                return {
+                    "success": True,
+                    "message": result.get("message", "VPN key created"),
+                    "vless_url": vpn_key.get("vless_url"),
+                    "id": vpn_key.get("id"),
+                    "created_at": vpn_key.get("created_at"),
+                    "status": "active",
+                    "is_new": True,
+                    "node_id": vpn_key.get("node_id"),
+                    "node_name": vpn_key.get("node_name"),
+                    "country": vpn_key.get("country"),
+                    "source": "COUNTRY_AWARE_CREATION"
+                }
+            else:
+                logger.error("Failed to create key for country", 
+                           telegram_id=telegram_id,
+                           result=result)
+                
+                # Fallback к обычному методу
+                return await self.update_user_key(telegram_id, username, first_name)
+                
+        except Exception as e:
+            logger.error("Error creating key for user country", 
+                        telegram_id=telegram_id, 
+                        error=str(e))
+            
+            # Fallback к обычному методу
+            return await self.update_user_key(telegram_id, username, first_name)
+
+    async def get_or_create_user_key_with_node(self, telegram_id: int, node_id: int, username: str = "", first_name: str = "") -> Dict:
+        """Получить ключ пользователя с конкретной ноды или создать новый"""
+        try:
+            logger.info("🔍 Getting user key for specific node", 
+                       telegram_id=telegram_id, node_id=node_id)
+            
+            # Проверяем, есть ли у пользователя ключ с этой ноды
+            dashboard_result = await self._make_request(
+                "GET", 
+                f"/api/v1/integration/user-dashboard/{telegram_id}"
+            )
+            
+            if dashboard_result and dashboard_result.get("success"):
+                # Пользователь существует, ищем ключ с нужной ноды
+                vpn_keys = dashboard_result.get("vpn_keys", [])
+                node_keys = [key for key in vpn_keys if key.get("node_id") == node_id and key.get("status") in ["active", "ACTIVE"]]
+                
+                if node_keys:
+                    # Есть ключ с нужной ноды - возвращаем его
+                    latest_key = sorted(node_keys, key=lambda k: k.get("id", 0), reverse=True)[0]
+                    
+                    logger.info("✅ Found existing key for node", 
+                               telegram_id=telegram_id,
+                               key_id=latest_key.get("id"),
+                               node_id=node_id)
+                    
+                    return {
+                        "success": True,
+                        "message": f"Получен ключ с ноды {node_id}",
+                        "vless_url": latest_key.get("vless_url"),
+                        "id": latest_key.get("id"),
+                        "created_at": latest_key.get("created_at"),
+                        "status": "active",
+                        "is_new": False,
+                        "node_id": node_id,
+                        "source": "EXISTING_KEY_SPECIFIC_NODE"
+                    }
+            
+            # Нет ключа с нужной ноды - создаем новый через обычный метод
+            # Предполагаем что ноды правильно назначены через country assignment
+            logger.info("🆕 No key for specific node, creating new one", 
+                       telegram_id=telegram_id, node_id=node_id)
+            
+            result = await self.update_user_key(telegram_id, username, first_name)
+            
+            if result and result.get("vless_url"):
+                logger.info("✅ Created new key (should be on correct node via assignment)", 
+                           telegram_id=telegram_id)
+                return result
+            
+            # Fallback к обычному методу
+            logger.warning("Failed to create key, using fallback", 
+                          telegram_id=telegram_id, node_id=node_id)
+            return await self.get_or_create_user_key(telegram_id, username, first_name)
+            
+        except Exception as e:
+            logger.error("Error getting key for specific node", 
+                        telegram_id=telegram_id, 
+                        node_id=node_id,
+                        error=str(e))
+            # Fallback к обычному методу
+            return await self.get_or_create_user_key(telegram_id, username, first_name)
+
     async def get_or_create_user_key(self, telegram_id: int, username: str = "", first_name: str = "") -> Dict:
         """Получить или создать ключ пользователя через простой backend API"""
         try:

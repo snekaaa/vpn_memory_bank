@@ -43,8 +43,9 @@ async def on_startup(bot: Bot):
     # Установка команд бота
     await bot.set_my_commands([
         BotCommand(command="start", description="Запустить бота"),
-        BotCommand(command="create_key", description="Создать/напомнить ключ"),
+        BotCommand(command="create_key", description="Мой VPN ключ"),
         BotCommand(command="refresh_key", description="Обновить ключ"),
+        BotCommand(command="subscription", description="Подписка"),
         BotCommand(command="download_apps", description="Скачать приложения"),
         BotCommand(command="support", description="Служба поддержки"),
     ])

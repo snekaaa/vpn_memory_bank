@@ -47,9 +47,19 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="location" class="form-label">Локация</label>
-                        <input type="text" class="form-control" id="location" name="location" value="{{ node.location or '' }}">
-                        <div class="form-text">Географическое расположение сервера</div>
+                        <label for="country_id" class="form-label">Страна сервера</label>
+                        <select class="form-select" id="country_id" name="country_id">
+                            <option value="">Выберите страну...</option>
+                            {% if countries %}
+                                {% for country in countries %}
+                                    <option value="{{ country.id }}" 
+                                            {% if node.country_id == country.id %}selected{% endif %}>
+                                        {{ country.flag_emoji }} {{ country.name }}
+                                    </option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                        <div class="form-text">Выберите страну для автоматического назначения ноды</div>
                     </div>
                     
                     <div class="mb-3">

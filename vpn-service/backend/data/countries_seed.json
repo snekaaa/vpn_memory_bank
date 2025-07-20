@@ -1,0 +1,52 @@
+{
+  "countries": [
+    {
+      "code": "RU",
+      "name": "Россия",
+      "name_en": "Russia",
+      "flag_emoji": "🇷🇺",
+      "is_active": true,
+      "priority": 100
+    },
+    {
+      "code": "NL",
+      "name": "Нидерланды",
+      "name_en": "Netherlands",
+      "flag_emoji": "🇳🇱",
+      "is_active": true,
+      "priority": 90
+    },
+    {
+      "code": "DE",
+      "name": "Германия",
+      "name_en": "Germany",
+      "flag_emoji": "🇩🇪",
+      "is_active": true,
+      "priority": 80
+    },
+    {
+      "code": "US",
+      "name": "США",
+      "name_en": "United States",
+      "flag_emoji": "🇺🇸",
+      "is_active": false,
+      "priority": 70
+    },
+    {
+      "code": "FR",
+      "name": "Франция",
+      "name_en": "France",
+      "flag_emoji": "🇫🇷",
+      "is_active": false,
+      "priority": 60
+    },
+    {
+      "code": "UK",
+      "name": "Великобритания",
+      "name_en": "United Kingdom",
+      "flag_emoji": "🇬🇧",
+      "is_active": false,
+      "priority": 50
+    }
+  ]
+} 

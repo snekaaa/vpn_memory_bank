@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 # from api_client import api_client  # Убрано - заменено на прямые HTTP запросы
 import aiohttp
 import structlog
+from typing import List, Optional
 
 logger = structlog.get_logger(__name__)
 
@@ -31,6 +32,112 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         ]
     )
     return keyboard
+
+
+def get_vpn_key_keyboard_with_countries(current_country_code: str, available_countries: List[dict]) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру с кнопкой обновления ключа и выбором стран (вертикальный макет)
+    
+    Args:
+        current_country_code: ISO код текущей страны пользователя
+        available_countries: Список стран с ключами {id, code, name, flag_emoji, is_active}
+    
+    Returns:
+        InlineKeyboardMarkup с вертикальным расположением кнопок стран
+    """
+    buttons = []
+    
+    # Первая кнопка - обновление ключа
+    buttons.append([
+        InlineKeyboardButton(
+            text="🔄 Обновить ключ",
+            callback_data="refresh_key"
+        )
+    ])
+    
+    # Добавляем кнопки для каждой страны
+    for country in available_countries:
+        country_code = country['code']
+        country_name = country['name']
+        flag_emoji = country['flag_emoji']
+        
+        # Определяем, является ли эта страна текущей
+        is_current = country_code == current_country_code
+        
+        # Формируем текст кнопки
+        if is_current:
+            # Текущая страна - показываем с галочкой и делаем disabled (не кликабельной)
+            button_text = f"{flag_emoji} {country_name} ✓"
+            # Для текущей страны используем callback, который не будет обрабатываться
+            callback_data = f"current_country:{country_code}"
+        else:
+            # Другие страны - обычные кнопки переключения
+            button_text = f"{flag_emoji} {country_name}"
+            callback_data = f"switch_country:{country_code}"
+        
+        # Добавляем кнопку страны в отдельной строке (вертикальный макет)
+        buttons.append([
+            InlineKeyboardButton(
+                text=button_text,
+                callback_data=callback_data
+            )
+        ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_country_selection_loading_keyboard() -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру во время переключения сервера (показывает процесс)
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="⏳ Переключение сервера...",
+                callback_data="switching_in_progress"
+            )]
+        ]
+    )
+
+
+def get_country_fallback_keyboard(available_countries: List[dict]) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру для выбора fallback страны когда основная недоступна
+    
+    Args:
+        available_countries: Список доступных стран для fallback
+    """
+    buttons = []
+    
+    # Добавляем текст с предупреждением
+    buttons.append([
+        InlineKeyboardButton(
+            text="⚠️ Выберите альтернативный сервер:",
+            callback_data="fallback_info"
+        )
+    ])
+    
+    # Добавляем доступные страны
+    for country in available_countries:
+        button_text = f"{country['flag_emoji']} {country['name']}"
+        callback_data = f"switch_country:{country['code']}"
+        
+        buttons.append([
+            InlineKeyboardButton(
+                text=button_text,
+                callback_data=callback_data
+            )
+        ])
+    
+    # Кнопка отмены
+    buttons.append([
+        InlineKeyboardButton(
+            text="❌ Отмена",
+            callback_data="cancel_country_switch"
+        )
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 async def get_subscription_keyboard_with_autopay() -> InlineKeyboardMarkup:

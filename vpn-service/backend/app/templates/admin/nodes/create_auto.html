@@ -72,9 +72,21 @@
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label for="auto_location" class="form-label">Локация</label>
-                                        <input type="text" class="form-control" id="auto_location" name="location" placeholder="Авто-определение">
-                                        <div class="form-text">Географическое расположение</div>
+                                        <label for="auto_location" class="form-label">Страна</label>
+                                        <select class="form-select" id="auto_location" name="location" required>
+                                            <option value="">Выберите страну</option>
+                                            {% if countries %}
+                                                {% for country in countries %}
+                                                    <option value="{{ country.name }}">
+                                                        {{ country.flag_emoji }} {{ country.name }}
+                                                    </option>
+                                                {% endfor %}
+                                            {% else %}
+                                                <option value="Нидерланды">🇳🇱 Нидерланды</option>
+                                                <option value="Германия">🇩🇪 Германия</option>
+                                            {% endif %}
+                                        </select>
+                                        <div class="form-text">Страна размещения VPN ноды</div>
                                     </div>
                                 </div>
                                 

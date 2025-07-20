@@ -7,6 +7,9 @@ from config.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from services.simple_key_update_service import SimpleKeyUpdateService
+# NEW: Country services integration
+from services.country_service import CountryService
+from services.user_server_service import UserServerService
 import structlog
 from models.user import User
 # from models.subscription import Subscription, SubscriptionStatus  # Убрано - упрощенная архитектура
@@ -108,6 +111,64 @@ async def get_user_dashboard_endpoint(telegram_id: int):
         raise HTTPException(status_code=404, detail=result["message"])
     
     return result
+
+
+@router.get("/user-dashboard-enhanced/{telegram_id}")
+async def get_user_dashboard_enhanced(telegram_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Получение расширенной информации о пользователе с данными о серверах и странах
+    Для использования в новом UI с выбором стран
+    """
+    try:
+        # Получаем базовую информацию о пользователе
+        base_result = await integration_service.get_user_dashboard(telegram_id)
+        
+        if not base_result["success"]:
+            raise HTTPException(status_code=404, detail=base_result["message"])
+        
+        # Инициализируем country services
+        country_service = CountryService(db)
+        user_server_service = UserServerService(db)
+        
+        # Получаем доступные страны
+        available_countries = await country_service.get_available_countries()
+        
+        # Получаем текущее назначение пользователя
+        current_assignment = await user_server_service.get_user_current_assignment(telegram_id)
+        
+        # Формируем расширенный ответ
+        enhanced_result = {
+            **base_result,  # Включаем всю базовую информацию
+            "countries": {
+                "available": [country.to_dict() for country in available_countries],
+                "current": None
+            }
+        }
+        
+        # Добавляем информацию о текущем сервере, если есть назначение
+        if current_assignment and current_assignment.country_id:
+            current_country = await country_service.get_country_by_id(current_assignment.country_id)
+            if current_country:
+                enhanced_result["countries"]["current"] = {
+                    "country": current_country.to_dict(),
+                    "node_id": current_assignment.node_id,
+                    "assigned_at": current_assignment.assigned_at.isoformat() if current_assignment.assigned_at else None,
+                    "last_switch_at": current_assignment.last_switch_at.isoformat() if current_assignment.last_switch_at else None
+                }
+        
+        logger.info("Enhanced user dashboard fetched", 
+                   telegram_id=telegram_id,
+                   countries_available=len(available_countries),
+                   has_assignment=bool(current_assignment))
+        
+        return enhanced_result
+        
+    except Exception as e:
+        logger.error("Failed to fetch enhanced user dashboard", 
+                    telegram_id=telegram_id, 
+                    error=str(e))
+        # Fallback к базовой функциональности
+        return await integration_service.get_user_dashboard(telegram_id)
 
 @router.post("/full-cycle")
 async def full_cycle_endpoint(

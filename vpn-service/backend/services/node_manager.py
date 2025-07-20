@@ -23,7 +23,8 @@ class NodeConfig:
     def __init__(self, name: str, x3ui_url: str, x3ui_username: str, x3ui_password: str,
                  description: str = "", location: str = "", max_users: int = 1000,
                  priority: int = 100, weight: float = 1.0,
-                 mode: NodeMode = NodeMode.default, reality_config: Optional[Dict[str, Any]] = None):
+                 mode: NodeMode = NodeMode.default, reality_config: Optional[Dict[str, Any]] = None,
+                 country_id: Optional[int] = None):
         self.name = name
         self.x3ui_url = x3ui_url
         self.x3ui_username = x3ui_username
@@ -35,6 +36,7 @@ class NodeConfig:
         self.weight = weight
         self.mode = mode
         self.reality_config = reality_config
+        self.country_id = country_id
 
 class NodeManager:
     """Управление серверными нодами VPN"""
@@ -73,6 +75,7 @@ class NodeManager:
                 'name': node_config.name,
                 'description': node_config.description,
                 'location': node_config.location,
+                'country_id': node_config.country_id,
                 'x3ui_url': node_config.x3ui_url,
                 'x3ui_username': node_config.x3ui_username,
                 'x3ui_password': node_config.x3ui_password,

@@ -53,17 +53,37 @@ async def list_nodes(
     })
 
 @router.get("/create", response_class=HTMLResponse)
-async def create_node_form(request: Request):
+async def create_node_form(request: Request, db: AsyncSession = Depends(get_db)):
     """Форма создания новой ноды"""
+    from sqlalchemy import select
+    from models.country import Country
+    
+    # Получаем все активные страны
+    countries_result = await db.execute(
+        select(Country).where(Country.is_active == True).order_by(Country.priority.desc())
+    )
+    countries = countries_result.scalars().all()
+    
     return templates.TemplateResponse("admin/nodes/create.html", {
-        "request": request
+        "request": request,
+        "countries": countries
     })
 
 @router.get("/auto/create", response_class=HTMLResponse)
-async def create_auto_node_form(request: Request):
+async def create_auto_node_form(request: Request, db: AsyncSession = Depends(get_db)):
     """Форма автоматического создания ноды (уникальный static path)"""
+    from sqlalchemy import select
+    from models.country import Country
+    
+    # Получаем все активные страны
+    countries_result = await db.execute(
+        select(Country).where(Country.is_active == True).order_by(Country.priority.desc())
+    )
+    countries = countries_result.scalars().all()
+    
     return templates.TemplateResponse("admin/nodes/create_auto.html", {
-        "request": request
+        "request": request,
+        "countries": countries
     })
 
 @router.post("/create")
@@ -81,6 +101,18 @@ async def create_node(
     db: AsyncSession = Depends(get_db)
 ):
     """Создание новой ноды"""
+    from sqlalchemy import select
+    from models.country import Country
+    
+    # Найдем country_id на основе выбранной локации
+    country_id = None
+    if location:
+        country_query = select(Country).where(Country.name == location)
+        country_result = await db.execute(country_query)
+        country = country_result.scalar_one_or_none()
+        if country:
+            country_id = country.id
+    
     node_manager = NodeManager(db)
     
     node_config = NodeConfig(
@@ -92,7 +124,8 @@ async def create_node(
         location=location,
         max_users=max_users,
         priority=priority,
-        weight=weight
+        weight=weight,
+        country_id=country_id  # Добавляем country_id
     )
     
     new_node = await node_manager.create_node(node_config)

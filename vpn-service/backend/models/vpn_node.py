@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, Text, Enum, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, Text, Enum, JSON, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from config.database import Base
@@ -17,6 +17,9 @@ class VPNNode(Base):
     name = Column(String(255), unique=True, nullable=False, index=True)
     description = Column(Text)
     location = Column(String(100))
+    
+    # NEW: Связь с таблицей стран
+    country_id = Column(Integer, ForeignKey("countries.id"), nullable=True, index=True)
     
     # X3UI connection settings
     x3ui_url = Column(String(255), nullable=False)
@@ -50,7 +53,8 @@ class VPNNode(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships убраны для избежания circular imports
-    # user_assignments = relationship("UserNodeAssignment", lazy="select")
+    user_assignments = relationship("UserServerAssignment", back_populates="node")
+    # country = relationship("Country", back_populates="nodes")
     
     def __repr__(self):
         return f"<VPNNode(id={self.id if hasattr(self, 'id') else None}, name={self.name if hasattr(self, 'name') else None})>"

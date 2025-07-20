@@ -39,14 +39,66 @@ class SimpleKeyUpdateService:
             if not user:
                 return {"success": False, "error": "Пользователь не найден"}
             
-            # 2. Получаем активную ноду
+            # 2. Получаем ноду согласно назначению пользователя
             from models.vpn_node import VPNNode
-            node_result = await session.execute(
-                select(VPNNode).where(VPNNode.status == "active")
-                .order_by(VPNNode.priority.desc())
-                .limit(1)
+            from models.user_server_assignment import UserServerAssignment
+            
+            logger.info("🔍 Looking for user assignment", user_id=user.id, telegram_id=user.telegram_id)
+            
+            # Сначала пытаемся найти назначенную ноду
+            assignment_result = await session.execute(
+                select(UserServerAssignment).where(UserServerAssignment.user_id == user.telegram_id)
             )
-            active_node = node_result.scalar_one_or_none()
+            assignment = assignment_result.scalar_one_or_none()
+            
+            logger.info("🎯 Assignment found", 
+                       user_id=user.id, 
+                       assignment_exists=assignment is not None,
+                       assigned_node_id=assignment.node_id if assignment else None)
+            
+            active_node = None
+            
+            if assignment and assignment.node_id:
+                logger.info("🔍 Checking assigned node", node_id=assignment.node_id)
+                
+                # Проверяем что назначенная нода активна
+                node_result = await session.execute(
+                    select(VPNNode).where(
+                        VPNNode.id == assignment.node_id,
+                        VPNNode.status == "active"
+                    )
+                )
+                active_node = node_result.scalar_one_or_none()
+                
+                if active_node:
+                    logger.info("✅ Using assigned node", 
+                               user_id=user.id, 
+                               node_id=assignment.node_id, 
+                               node_name=active_node.name,
+                               node_location=active_node.location)
+                else:
+                    logger.warning("❌ Assigned node is not active, selecting fallback", 
+                                  user_id=user.id, 
+                                  assigned_node_id=assignment.node_id)
+            else:
+                logger.info("ℹ️ No assignment found, will use fallback", user_id=user.id)
+            
+            # Если нет назначения или назначенная нода неактивна, берем любую активную
+            if not active_node:
+                logger.info("🔄 Selecting fallback node", user_id=user.id)
+                
+                node_result = await session.execute(
+                    select(VPNNode).where(VPNNode.status == "active")
+                    .order_by(VPNNode.priority.desc())
+                    .limit(1)
+                )
+                active_node = node_result.scalar_one_or_none()
+                
+                logger.info("🆘 Using fallback node", 
+                           user_id=user.id, 
+                           node_id=active_node.id if active_node else None,
+                           node_name=active_node.name if active_node else None,
+                           node_location=active_node.location if active_node else None)
             
             if not active_node:
                 return {"success": False, "error": "Нет доступных активных VPN нод"}
@@ -145,18 +197,83 @@ class SimpleKeyUpdateService:
                 if active_key and active_key.xui_client_id:
                     logger.info("🗑️ Удаляем старый ключ из панели", 
                                key_id=active_key.id, 
-                               client_id=active_key.xui_client_id)
+                               client_id=active_key.xui_client_id,
+                               old_node_id=active_key.node_id,
+                               new_node_id=active_node.id)
                     
                     # Пытаемся удалить ключ из панели
                     try:
-                        old_key_deleted = await x3ui_client.delete_client(inbound_id, active_key.xui_client_id)
+                        # ИСПРАВЛЕНИЕ: Если старый ключ с другой ноды, подключаемся к той ноде
+                        if active_key.node_id and active_key.node_id != active_node.id:
+                            logger.info("🔄 Старый ключ с другой ноды, подключаемся к старой ноде", 
+                                       old_node_id=active_key.node_id, 
+                                       new_node_id=active_node.id)
+                            
+                            # Получаем данные старой ноды
+                            old_node_result = await session.execute(
+                                select(VPNNode).where(VPNNode.id == active_key.node_id)
+                            )
+                            old_node = old_node_result.scalar_one_or_none()
+                            
+                            if old_node:
+                                # Создаем клиент для старой ноды
+                                old_x3ui_client = X3UIClient(
+                                    base_url=old_node.x3ui_url,
+                                    username=old_node.x3ui_username,
+                                    password=old_node.x3ui_password
+                                )
+                                
+                                if await old_x3ui_client._login():
+                                    # Получаем inbound'ы старой ноды для поиска правильного ID
+                                    old_inbounds = await old_x3ui_client.get_inbounds()
+                                    old_reality_inbound = None
+                                    
+                                    if old_inbounds:
+                                        import json
+                                        for inbound in old_inbounds:
+                                            if (inbound.get("protocol") == "vless" and 
+                                                inbound.get("port") == 443 and
+                                                inbound.get("enable") == True):
+                                                
+                                                stream_settings = json.loads(inbound.get("streamSettings", "{}"))
+                                                if stream_settings.get("security") == "reality":
+                                                    old_reality_inbound = inbound
+                                                    break
+                                    
+                                    if old_reality_inbound:
+                                        old_inbound_id = old_reality_inbound["id"]
+                                        old_key_deleted = await old_x3ui_client.delete_client(old_inbound_id, active_key.xui_client_id)
+                                        
+                                        if old_key_deleted:
+                                            logger.info("✅ Старый ключ успешно удален из старой ноды", 
+                                                       key_id=active_key.id, 
+                                                       client_id=active_key.xui_client_id,
+                                                       old_node_id=old_node.id)
+                                        else:
+                                            logger.warning("⚠️ Не удалось удалить ключ из старой ноды", 
+                                                          key_id=active_key.id,
+                                                          old_node_id=old_node.id)
+                                    else:
+                                        logger.warning("⚠️ Reality inbound не найден на старой ноде", 
+                                                      old_node_id=old_node.id)
+                                        # Продолжаем, считая что ключ "удален"
+                                        old_key_deleted = True
+                                else:
+                                    logger.warning("⚠️ Не удалось подключиться к старой ноде", 
+                                                  old_node_id=old_node.id)
+                                    # Продолжаем, считая что ключ "удален"
+                                    old_key_deleted = True
+                            else:
+                                logger.warning("⚠️ Старая нода не найдена в БД", 
+                                              old_node_id=active_key.node_id)
+                                # Продолжаем, считая что ключ "удален"
+                                old_key_deleted = True
+                        else:
+                            # Старый ключ с той же ноды - используем текущий клиент
+                            old_key_deleted = await x3ui_client.delete_client(inbound_id, active_key.xui_client_id)
                         
                         if old_key_deleted:
-                            logger.info("✅ Старый ключ успешно удален из панели", 
-                                       key_id=active_key.id, 
-                                       client_id=active_key.xui_client_id)
-                            
-                            # Удаляем из БД только если успешно удалили из панели
+                            # Удаляем из БД только если успешно удалили из панели (или пропустили)
                             await session.delete(active_key)
                             await session.commit()
                             logger.info("✅ Старый ключ удален из БД", key_id=active_key.id)

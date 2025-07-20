@@ -1,10 +1,25 @@
 """
-Модель пользователя для бота
+User model for bot
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+import sys
+import os
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, func
 from sqlalchemy.orm import relationship
-from services.vpn_manager import Base
+
+# Исправленный импорт для backend services
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../backend'))
+
+try:
+    from models.database import Base
+except ImportError:
+    try:
+        from config.database import Base
+    except ImportError:
+        # Fallback - создаем простую заглушку
+        from sqlalchemy.ext.declarative import declarative_base
+        Base = declarative_base()
 
 class User(Base):
     """Модель пользователя"""

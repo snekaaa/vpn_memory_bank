@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="bi bi-plus-circle"></i> Добавить страну</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <div class="btn-group me-2">
+                        <a href="/admin/countries" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Назад к списку
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-globe"></i> Информация о стране
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/countries/create" method="post">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="code" class="form-label">Код страны *</label>
+                                    <input type="text" class="form-control" id="code" name="code" 
+                                           maxlength="2" pattern="[A-Z]{2}" required
+                                           placeholder="RU, US, DE, FR..."
+                                           style="text-transform: uppercase;">
+                                    <div class="form-text">ISO 3166-1 alpha-2 код (2 буквы)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Название на русском *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required
+                                           placeholder="Россия, Германия, США...">
+                                    <div class="form-text">Полное название страны</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="name_en" class="form-label">Название на английском</label>
+                                    <input type="text" class="form-control" id="name_en" name="name_en"
+                                           placeholder="Russia, Germany, USA...">
+                                    <div class="form-text">Название на английском языке (опционально)</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="flag_emoji" class="form-label">Флаг (эмодзи) *</label>
+                                    <input type="text" class="form-control" id="flag_emoji" name="flag_emoji" 
+                                           maxlength="10" required
+                                           placeholder="🇷🇺, 🇩🇪, 🇺🇸...">
+                                    <div class="form-text">Флаг страны в виде эмодзи</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="priority" class="form-label">Приоритет</label>
+                                    <input type="number" class="form-control" id="priority" name="priority" 
+                                           value="100" min="1" max="999">
+                                    <div class="form-text">Порядок отображения (выше = раньше в списке)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Предварительный просмотр</h6>
+                                            <div id="preview" class="d-flex align-items-center">
+                                                <span id="previewFlag" class="me-2 fs-4">🌍</span>
+                                                <div>
+                                                    <div id="previewName" class="fw-bold">Название страны</div>
+                                                    <small id="previewCode" class="text-muted">КОД</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <a href="/admin/countries" class="btn btn-secondary">
+                                        <i class="bi bi-arrow-left"></i> Отмена
+                                    </a>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle"></i> Создать страну
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Превью в реальном времени
+function updatePreview() {
+    const flag = document.getElementById('flag_emoji').value || '🌍';
+    const name = document.getElementById('name').value || 'Название страны';
+    const code = document.getElementById('code').value.toUpperCase() || 'КОД';
+    
+    document.getElementById('previewFlag').textContent = flag;
+    document.getElementById('previewName').textContent = name;
+    document.getElementById('previewCode').textContent = code;
+}
+
+// Автоматическое обновление превью
+document.getElementById('flag_emoji').addEventListener('input', updatePreview);
+document.getElementById('name').addEventListener('input', updatePreview);
+document.getElementById('code').addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+    updatePreview();
+});
+
+// Популярные страны - быстрый выбор
+const popularCountries = [
+    { code: 'US', name: 'США', name_en: 'United States', flag: '🇺🇸' },
+    { code: 'FR', name: 'Франция', name_en: 'France', flag: '🇫🇷' },
+    { code: 'GB', name: 'Великобритания', name_en: 'United Kingdom', flag: '🇬🇧' },
+    { code: 'JP', name: 'Япония', name_en: 'Japan', flag: '🇯🇵' },
+    { code: 'CA', name: 'Канада', name_en: 'Canada', flag: '🇨🇦' },
+    { code: 'AU', name: 'Австралия', name_en: 'Australia', flag: '🇦🇺' }
+];
+
+// Добавим кнопки быстрого выбора
+const quickSelectContainer = document.createElement('div');
+quickSelectContainer.className = 'mb-3';
+quickSelectContainer.innerHTML = `
+    <label class="form-label">Быстрый выбор:</label>
+    <div class="d-flex flex-wrap gap-2">
+        ${popularCountries.map(country => `
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="selectCountry('${country.code}', '${country.name}', '${country.name_en}', '${country.flag}')">
+                ${country.flag} ${country.name}
+            </button>
+        `).join('')}
+    </div>
+`;
+
+// Вставляем после поля флага
+document.getElementById('flag_emoji').parentNode.parentNode.appendChild(quickSelectContainer);
+
+function selectCountry(code, name, nameEn, flag) {
+    document.getElementById('code').value = code;
+    document.getElementById('name').value = name;
+    document.getElementById('name_en').value = nameEn;
+    document.getElementById('flag_emoji').value = flag;
+    updatePreview();
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-globe"></i> Управление странами VPN серверов
+                    </h5>
+                    <div>
+                        <a href="/admin/countries/create" class="btn btn-sm btn-success me-2">
+                            <i class="bi bi-plus-circle"></i> Добавить страну
+                        </a>
+                        <button class="btn btn-sm btn-outline-primary" onclick="refreshStats()">
+                            <i class="bi bi-arrow-clockwise"></i> Обновить
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if countries_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Страна</th>
+                                    <th>Статус</th>
+                                    <th>Ноды</th>
+                                    <th>Здоровые ноды</th>
+                                    <th>Общая емкость</th>
+                                    <th>Текущие пользователи</th>
+                                    <th>Загрузка</th>
+                                    <th>Назначения</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in countries_stats %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2 fs-4">{{ stat.country.flag_emoji }}</span>
+                                            <div>
+                                                <div class="fw-bold">{{ stat.country.name }}</div>
+                                                <small class="text-muted">{{ stat.country.code }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if stat.country.is_active %}
+                                            <span class="badge bg-success">Активна</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Неактивна</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ stat.total_nodes }}</td>
+                                    <td>
+                                        <span class="{% if stat.healthy_nodes == stat.total_nodes %}text-success{% elif stat.healthy_nodes == 0 %}text-danger{% else %}text-warning{% endif %}">
+                                            {{ stat.healthy_nodes }}
+                                        </span>
+                                    </td>
+                                    <td>{{ stat.total_capacity }}</td>
+                                    <td>{{ stat.current_users }}</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px;">
+                                            <div class="progress-bar 
+                                                {% if stat.load_percentage < 70 %}bg-success
+                                                {% elif stat.load_percentage < 90 %}bg-warning
+                                                {% else %}bg-danger{% endif %}" 
+                                                style="width: {{ stat.load_percentage }}%">
+                                                {{ "%.1f"|format(stat.load_percentage) }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ stat.user_assignments }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/countries/{{ stat.country.id }}/nodes" 
+                                               class="btn btn-outline-primary">
+                                                <i class="bi bi-hdd-network"></i> Ноды
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Summary Stats -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-globe fs-2 me-3"></i>
+                                        <div>
+                                            <h5 class="mb-0">{{ countries_stats|length }}</h5>
+                                            <small>Всего стран</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-check-circle fs-2 me-3"></i>
+                                        <div>
+                                            <h5 class="mb-0">{{ countries_stats|selectattr('country.is_active')|list|length }}</h5>
+                                            <small>Активных стран</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-hdd-network fs-2 me-3"></i>
+                                        <div>
+                                            <h5 class="mb-0">{{ countries_stats|sum(attribute='total_nodes') }}</h5>
+                                            <small>Всего нод</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-people fs-2 me-3"></i>
+                                        <div>
+                                            <h5 class="mb-0">{{ countries_stats|sum(attribute='user_assignments') }}</h5>
+                                            <small>Назначений пользователей</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-globe text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">Страны не найдены</h5>
+                        <p class="text-muted">Пока нет стран в системе</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Additional Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-tools"></i> Дополнительные действия
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-file-earmark-text"></i> Логи переключений</h6>
+                                    <p class="card-text">Просмотр логов переключения пользователей между серверами</p>
+                                    <a href="/admin/countries/logs" class="btn btn-outline-info">
+                                        Открыть логи
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-graph-up"></i> Статистика API</h6>
+                                    <p class="card-text">Получить подробную статистику через API</p>
+                                    <button class="btn btn-outline-secondary" onclick="showApiStats()">
+                                        Показать API
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshStats() {
+    location.reload();
+}
+
+async function showApiStats() {
+    try {
+        const response = await fetch('/admin/api/countries/stats');
+        const data = await response.json();
+        
+        // Показываем данные в модальном окне или консоли
+        console.log('Countries API Stats:', data);
+        alert('Статистика выведена в консоль разработчика');
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        alert('Ошибка получения статистики');
+    }
+}
+</script>
+{% endblock %} 
