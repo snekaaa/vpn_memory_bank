@@ -76,6 +76,14 @@ from services.node_automation import (
     DeploymentMethod
 )
 
+# NEW: User deletion service import
+from services.user_deletion_service import (
+    UserDeletionService, 
+    get_user_deletion_service,
+    DeletionResult,
+    KeyDeletionResult
+)
+
 # Создаем роутер
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -3290,3 +3298,207 @@ async def admin_create_country(
                 "error": f"Ошибка создания страны: {str(e)}"
             }
         )
+
+# =============================================================================
+# USER DELETION MANAGEMENT
+# =============================================================================
+
+@router.get("/users/{user_id}/deletion-preview")
+async def get_user_deletion_preview(
+    user_id: int,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """API получения превью удаления пользователя"""
+    try:
+        deletion_service = get_user_deletion_service(db)
+        preview = await deletion_service.get_user_deletion_preview(user_id)
+        
+        if "error" in preview:
+            raise HTTPException(status_code=404, detail=preview["error"])
+        
+        logger.info("User deletion preview generated", 
+                   user_id=user_id, 
+                   admin_user=current_admin,
+                   can_delete=preview.get("can_delete", False))
+        
+        return {
+            "success": True,
+            "preview": preview
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error generating user deletion preview", 
+                    user_id=user_id, 
+                    error=str(e))
+        raise HTTPException(status_code=500, detail="Ошибка получения превью удаления")
+
+
+@router.delete("/users/{user_id}")
+async def delete_user_completely(
+    user_id: int,
+    request: Request,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """API полного удаления пользователя из системы"""
+    try:
+        # Получаем данные из тела запроса
+        body = await request.json()
+        confirmation = body.get("confirmation", "")
+        force_delete = body.get("force_delete", False)
+        
+        # Валидация подтверждения
+        if not confirmation:
+            raise HTTPException(status_code=400, detail="Требуется подтверждение удаления")
+        
+        # Получаем информацию о пользователе для проверки подтверждения
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Проверяем подтверждение (имя пользователя или telegram_id)
+        expected_confirmations = [
+            user.username,
+            user.first_name,
+            str(user.telegram_id),
+            f"{user.first_name} {user.last_name}".strip()
+        ]
+        expected_confirmations = [c for c in expected_confirmations if c]
+        
+        if confirmation not in expected_confirmations:
+            raise HTTPException(
+                status_code=400, 
+                detail="Неверное подтверждение. Введите имя пользователя, username или Telegram ID"
+            )
+        
+        logger.info("Starting user deletion process", 
+                   user_id=user_id, 
+                   admin_user=current_admin,
+                   force_delete=force_delete,
+                   confirmation_used=confirmation)
+        
+        # Выполняем удаление
+        deletion_service = get_user_deletion_service(db)
+        result = await deletion_service.delete_user_completely(
+            user_id=user_id,
+            admin_user=current_admin,
+            force_delete=force_delete
+        )
+        
+        # Форматируем ответ
+        response_data = {
+            "success": result.success,
+            "user_id": result.user_id,
+            "user_telegram_id": result.user_telegram_id,
+            "username": result.username,
+            "deletion_summary": {
+                "vpn_keys_found": result.vpn_keys_found,
+                "vpn_keys_deleted": result.vpn_keys_deleted,
+                "database_cleanup_success": result.database_cleanup_success,
+                "total_duration_seconds": result.total_duration_seconds
+            },
+            "x3ui_deletions": [
+                {
+                    "vpn_key_id": d.vpn_key_id,
+                    "node_name": d.node_name,
+                    "success": d.x3ui_success,
+                    "error": d.error_message
+                }
+                for d in result.x3ui_deletions
+            ],
+            "errors": result.errors,
+            "warnings": result.warnings
+        }
+        
+        if result.success:
+            logger.info("User deletion completed successfully", 
+                       user_id=user_id, 
+                       admin_user=current_admin,
+                       duration=result.total_duration_seconds)
+            
+            response_data["message"] = "Пользователь успешно удален из системы"
+        else:
+            logger.error("User deletion failed", 
+                        user_id=user_id, 
+                        admin_user=current_admin,
+                        errors=result.errors)
+            
+            response_data["message"] = "Удаление пользователя завершилось с ошибками"
+        
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Critical error during user deletion API", 
+                    user_id=user_id, 
+                    error=str(e),
+                    exc_info=True)
+        raise HTTPException(status_code=500, detail="Критическая ошибка при удалении пользователя")
+
+
+@router.post("/users/{user_id}/deletion-check")
+async def check_user_deletion_safety(
+    user_id: int,
+    current_admin: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Проверка безопасности удаления пользователя"""
+    try:
+        deletion_service = get_user_deletion_service(db)
+        
+        # Получаем превью удаления
+        preview = await deletion_service.get_user_deletion_preview(user_id)
+        
+        if "error" in preview:
+            raise HTTPException(status_code=404, detail=preview["error"])
+        
+        # Анализируем безопасность удаления
+        safety_analysis = {
+            "can_delete_safely": preview.get("can_delete", False),
+            "blockers": preview.get("blockers", []),
+            "impact_assessment": {
+                "vpn_keys_to_delete": preview["deletion_preview"]["vpn_keys"],
+                "related_records_to_clean": (
+                    preview["deletion_preview"]["server_assignments"] +
+                    preview["deletion_preview"]["switch_logs"] +
+                    preview["deletion_preview"]["auto_payments"]
+                ),
+                "payments_to_preserve": preview["deletion_preview"]["payments_to_update"]
+            },
+            "recommendations": []
+        }
+        
+        # Добавляем рекомендации
+        if preview["deletion_preview"]["vpn_keys"] > 0:
+            safety_analysis["recommendations"].append(
+                f"Будет удалено {preview['deletion_preview']['vpn_keys']} VPN ключей"
+            )
+        
+        if preview["deletion_preview"]["payments_to_update"] > 0:
+            safety_analysis["recommendations"].append(
+                f"У пользователя есть {preview['deletion_preview']['payments_to_update']} платежей - они сохранятся, но ссылка на пользователя будет удалена"
+            )
+        
+        if not preview.get("can_delete", False):
+            safety_analysis["recommendations"].append(
+                "Удаление заблокировано - устраните блокирующие условия или используйте принудительное удаление"
+            )
+        
+        return {
+            "success": True,
+            "safety_analysis": safety_analysis
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error checking user deletion safety", 
+                    user_id=user_id, 
+                    error=str(e))
+        raise HTTPException(status_code=500, detail="Ошибка проверки безопасности удаления")

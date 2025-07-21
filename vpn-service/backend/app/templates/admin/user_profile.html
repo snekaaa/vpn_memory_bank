@@ -17,6 +17,9 @@
         <a href="/admin/payments/create?user_id={{ user.id }}" class="btn btn-primary">
             <i class="bi bi-plus-circle me-1"></i>Создать платеж
         </a>
+        <button type="button" class="btn btn-danger" onclick="showDeleteUserModal()">
+            <i class="bi bi-trash me-1"></i>Удалить пользователя
+        </button>
     </div>
 </div>
 
@@ -420,6 +423,195 @@ async function cancelUserAutopay(userId) {
     } catch (error) {
         console.error('Ошибка при отключении автоплатежа:', error);
         alert('Ошибка при отключении автоплатежа');
+    }
+}
+
+// User deletion functionality
+async function showDeleteUserModal() {
+    try {
+        // Get deletion preview
+        const response = await fetch('/admin/users/{{ user.id }}/deletion-preview');
+        const data = await response.json();
+        
+        if (!data.success) {
+            alert('Ошибка получения информации для удаления: ' + (data.error || 'Неизвестная ошибка'));
+            return;
+        }
+        
+        const preview = data.preview;
+        const user = preview.user;
+        const deletionInfo = preview.deletion_preview;
+        
+        // Create modal content
+        let modalContent = '<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">';
+        modalContent += '<div class="modal-dialog modal-lg">';
+        modalContent += '<div class="modal-content">';
+        modalContent += '<div class="modal-header bg-danger text-white">';
+        modalContent += '<h5 class="modal-title" id="deleteUserModalLabel">';
+        modalContent += '<i class="bi bi-exclamation-triangle me-2"></i>Удаление пользователя';
+        modalContent += '</h5>';
+        modalContent += '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>';
+        modalContent += '</div>';
+        modalContent += '<div class="modal-body">';
+        modalContent += '<div class="alert alert-danger" role="alert">';
+        modalContent += '<strong>⚠️ ВНИМАНИЕ!</strong> Это действие необратимо!';
+        modalContent += '</div>';
+        
+        modalContent += '<h6>Пользователь для удаления:</h6>';
+        modalContent += '<ul>';
+        modalContent += '<li><strong>ID:</strong> ' + user.id + '</li>';
+        modalContent += '<li><strong>Telegram ID:</strong> ' + user.telegram_id + '</li>';
+        modalContent += '<li><strong>Имя:</strong> ' + (user.first_name || 'Не указано') + '</li>';
+        modalContent += '<li><strong>Username:</strong> ' + (user.username ? '@' + user.username : 'Не указан') + '</li>';
+        modalContent += '</ul>';
+        
+        modalContent += '<h6>Что будет удалено:</h6>';
+        modalContent += '<ul>';
+        modalContent += '<li>🔑 VPN ключей: <strong>' + deletionInfo.vpn_keys + '</strong></li>';
+        modalContent += '<li>📋 Назначений серверов: <strong>' + deletionInfo.server_assignments + '</strong></li>';
+        modalContent += '<li>📊 Логов переключений: <strong>' + deletionInfo.switch_logs + '</strong></li>';
+        modalContent += '<li>💳 Автоплатежей: <strong>' + deletionInfo.auto_payments + '</strong></li>';
+        modalContent += '</ul>';
+        
+        modalContent += '<h6>Что будет сохранено:</h6>';
+        modalContent += '<ul>';
+        modalContent += '<li>💰 Платежи (' + deletionInfo.payments_to_update + ' шт.) - сохранятся, но связь с пользователем будет удалена</li>';
+        modalContent += '</ul>';
+        
+        // Add blockers if any
+        if (preview.blockers && preview.blockers.length > 0) {
+            modalContent += '<div class="alert alert-warning" role="alert">';
+            modalContent += '<h6>⚠️ Предупреждения:</h6>';
+            modalContent += '<ul class="mb-0">';
+            preview.blockers.forEach(function(blocker) {
+                modalContent += '<li>' + blocker + '</li>';
+            });
+            modalContent += '</ul>';
+            modalContent += '</div>';
+        }
+        
+        modalContent += '<div class="mt-4">';
+        modalContent += '<label for="deleteConfirmation" class="form-label">';
+        modalContent += '<strong>Для подтверждения введите имя пользователя, username или Telegram ID:</strong>';
+        modalContent += '</label>';
+        modalContent += '<input type="text" class="form-control" id="deleteConfirmation" ';
+        modalContent += 'placeholder="Введите: ' + (user.first_name || user.username || user.telegram_id) + '">';
+        modalContent += '<small class="text-muted">';
+        const confirmOptions = [user.first_name, user.username, user.telegram_id].filter(function(x) { return x; });
+        modalContent += 'Доступные варианты: ' + confirmOptions.join(', ');
+        modalContent += '</small>';
+        modalContent += '</div>';
+        
+        if (preview.blockers && preview.blockers.length > 0) {
+            modalContent += '<div class="form-check mt-3">';
+            modalContent += '<input class="form-check-input" type="checkbox" id="forceDelete">';
+            modalContent += '<label class="form-check-label text-warning" for="forceDelete">';
+            modalContent += '<strong>Принудительное удаление</strong> (игнорировать предупреждения)';
+            modalContent += '</label>';
+            modalContent += '</div>';
+        }
+        
+        modalContent += '</div>';
+        modalContent += '<div class="modal-footer">';
+        modalContent += '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>';
+        modalContent += '<button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">';
+        modalContent += '<i class="bi bi-trash me-1"></i>Удалить пользователя';
+        modalContent += '</button>';
+        modalContent += '</div>';
+        modalContent += '</div>';
+        modalContent += '</div>';
+        modalContent += '</div>';
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('deleteUserModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Ошибка при загрузке информации для удаления:', error);
+        alert('Ошибка при загрузке информации для удаления');
+    }
+}
+
+async function confirmDeleteUser() {
+    const confirmation = document.getElementById('deleteConfirmation').value.trim();
+    const forceDeleteCheckbox = document.getElementById('forceDelete');
+    const forceDelete = forceDeleteCheckbox ? forceDeleteCheckbox.checked : false;
+    
+    if (!confirmation) {
+        alert('Введите подтверждение для удаления');
+        return;
+    }
+    
+    if (!confirm('Вы уверены? Это действие необратимо!')) {
+        return;
+    }
+    
+    try {
+        // Show progress
+        const deleteButton = document.querySelector('[onclick="confirmDeleteUser()"]');
+        const originalText = deleteButton.innerHTML;
+        deleteButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Удаление...';
+        deleteButton.disabled = true;
+        
+        // Perform deletion
+        const response = await fetch('/admin/users/{{ user.id }}', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                confirmation: confirmation,
+                force_delete: forceDelete
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
+            modal.hide();
+            
+            // Show success message
+            let successMessage = 'Пользователь успешно удален!\n\nСводка:\n';
+            successMessage += '- VPN ключей удалено: ' + result.deletion_summary.vpn_keys_deleted + '/' + result.deletion_summary.vpn_keys_found + '\n';
+            successMessage += '- Время выполнения: ' + Math.round(result.deletion_summary.total_duration_seconds) + ' сек.';
+            alert(successMessage);
+            
+            // Redirect to users list
+            window.location.href = '/admin/users';
+        } else {
+            deleteButton.innerHTML = originalText;
+            deleteButton.disabled = false;
+            
+            let errorMessage = result.message || 'Ошибка при удалении пользователя';
+            if (result.errors && result.errors.length > 0) {
+                errorMessage += '\n\nОшибки:\n' + result.errors.join('\n');
+            }
+            if (result.warnings && result.warnings.length > 0) {
+                errorMessage += '\n\nПредупреждения:\n' + result.warnings.join('\n');
+            }
+            
+            alert(errorMessage);
+        }
+        
+    } catch (error) {
+        console.error('Ошибка при удалении пользователя:', error);
+        alert('Ошибка при удалении пользователя: ' + error.message);
+        
+        // Restore button
+        const deleteButton = document.querySelector('[onclick="confirmDeleteUser()"]');
+        deleteButton.innerHTML = '<i class="bi bi-trash me-1"></i>Удалить пользователя';
+        deleteButton.disabled = false;
     }
 }
 </script>
