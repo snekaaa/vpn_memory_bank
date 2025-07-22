@@ -109,19 +109,30 @@ async def start_command(message: types.Message, state: FSMContext):
 
 @start_router.message(F.text == "🔐 Получить VPN доступ")
 async def get_vpn_access_handler(message: types.Message):
-    """Обработчик кнопки 'Получить VPN доступ' - показывает планы подписки"""
+    """Обработчик кнопки 'Получить VPN доступ' - показывает планы подписки с toggle автоплатежа"""
     try:
         telegram_id = message.from_user.id
         logger.info("User requested VPN access (no subscription)", telegram_id=telegram_id)
         
-        # Показываем планы подписки
-        from keyboards.main_menu import get_subscription_keyboard_with_autopay
+        # Получаем настройки автоплатежа пользователя
+        try:
+            # Импортируем SimpleAPIClient для получения настроек
+            from handlers.payments import SimpleAPIClient
+            api_client = SimpleAPIClient()
+            auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
+            autopay_enabled = auto_payment_info.get('enabled', True)  # Default to True if not found
+        except Exception as e:
+            logger.error(f"Error getting autopay settings: {e}")
+            autopay_enabled = True  # Fallback to default
         
-        subscription_keyboard = await get_subscription_keyboard_with_autopay()
+        # Показываем планы подписки с toggle автоплатежа
+        from keyboards.main_menu import get_subscription_keyboard_with_autopay_toggle
+        
+        subscription_keyboard = await get_subscription_keyboard_with_autopay_toggle(autopay_enabled)
         
         await message.answer(
-            "🔐 **VPN доступ требует активную подписку**\n\n"
-            "Выберите подходящий план подписки для получения доступа к VPN ключам:",
+            "💳 **Выберите план подписки:**\n\n"
+            "📊 Доступные тарифы для подключения VPN сервиса",
             reply_markup=subscription_keyboard,
             parse_mode='Markdown'
         )
