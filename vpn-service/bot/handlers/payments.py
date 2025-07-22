@@ -141,18 +141,32 @@ async def show_active_subscription_info_with_autopay_state(message: Message, sub
 
 async def show_subscription_plans_selection(message: Message, state: FSMContext):
     """Показать выбор планов подписки для пользователей без активной подписки"""
-    
-    await state.set_state(PaymentStates.selecting_plan)
-    
-    text = (
-        f"💳 **Выберите план подписки:**\n\n"
-        f"📊 Доступные тарифы для подключения VPN сервиса"
-    )
-    
-    # Для новых пользователей по умолчанию автопродление включено
-    keyboard = await get_subscription_keyboard_with_autopay_toggle(autopay_enabled=True)
-    
-    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+    try:
+        telegram_id = message.from_user.id
+        api_client = SimpleAPIClient()
+        
+        # Получаем актуальную настройку автоплатежа от пользователя
+        auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
+        autopay_enabled = auto_payment_info.get('enabled', True)  # Default to True if not found
+        
+        await state.set_state(PaymentStates.selecting_plan)
+        
+        text = (
+            f"💳 **Выберите план подписки:**\n\n"
+            f"📊 Доступные тарифы для подключения VPN сервиса"
+        )
+        
+        # Используем полученную настройку автоплатежа
+        keyboard = await get_subscription_keyboard_with_autopay_toggle(autopay_enabled)
+        
+        await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error showing subscription plans: {e}")
+        await message.answer(
+            "❌ Ошибка загрузки планов подписки. Попробуйте позже.",
+            reply_markup=get_back_to_menu_keyboard()
+        )
 
 @router.message(F.text.startswith("💳 Подписка"))
 async def show_subscription_plans(message: Message, state: FSMContext):
@@ -897,10 +911,12 @@ async def handle_toggle_autopay_on(callback: CallbackQuery):
         telegram_id = callback.from_user.id
         api_client = SimpleAPIClient()
         
+        # Вызываем API для включения автопродления
         result = await api_client.enable_user_auto_payment(telegram_id)
         
         if result and result.get('success'):
             await callback.answer("✅ Автопродление включено")
+            
             # Получаем обновленную информацию о подписке
             subscription_info = await api_client.get_user_subscription_status(telegram_id)
             
@@ -909,19 +925,79 @@ async def handle_toggle_autopay_on(callback: CallbackQuery):
                 
                 if days_remaining > 0:
                     # Обновляем меню для активной подписки
-                    await show_active_subscription_info_with_autopay_state(callback.message, subscription_info, telegram_id, True)
+                    try:
+                        await show_active_subscription_info_with_autopay_state(callback.message, subscription_info, telegram_id, True)
+                    except Exception as e:
+                        logger.error(f"Ошибка обновления UI для активной подписки: {e}")
+                        # Если не удалось обновить UI, отправляем новое сообщение
+                        await callback.message.answer(
+                            "✅ Автопродление успешно включено для вашей подписки.",
+                            reply_markup=get_back_to_menu_keyboard()
+                        )
                 else:
                     # Обновляем меню выбора планов
-                    await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=True)
+                    try:
+                        await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=True)
+                    except Exception as e:
+                        logger.error(f"Ошибка обновления UI для выбора планов: {e}")
+                        # Если не удалось обновить UI, отправляем новое сообщение
+                        await callback.message.answer(
+                            "✅ Автопродление успешно включено. Выберите план подписки:",
+                            reply_markup=await get_subscription_keyboard_with_autopay_toggle(True)
+                        )
             else:
-                # Если не удалось получить статус подписки, обновляем с включенным автопродлением
-                await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=True)
+                error_msg = subscription_info.get('message', 'Неизвестная ошибка') if subscription_info else 'Не удалось получить информацию о подписке'
+                logger.warning(f"Не удалось получить статус подписки при включении автопродления: {error_msg}")
+                
+                # Обновляем меню выбора планов с включенным автопродлением
+                try:
+                    await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=True)
+                except Exception as e:
+                    logger.error(f"Ошибка обновления UI после включения автопродления: {e}")
+                    # Если не удалось обновить UI, отправляем новое сообщение
+                    await callback.message.answer(
+                        "✅ Автопродление успешно включено. Выберите план подписки:",
+                        reply_markup=await get_subscription_keyboard_with_autopay_toggle(True)
+                    )
         else:
-            await callback.answer("❌ Ошибка включения автопродления")
+            # Обработка ошибки от API
+            error_msg = result.get('message', 'Неизвестная ошибка') if result else 'Не удалось подключиться к серверу'
+            logger.error(f"Ошибка включения автопродления: {error_msg}")
+            await callback.answer(f"❌ Ошибка: {error_msg}")
+            
+            # Получаем текущее состояние автопродления для корректного отображения UI
+            auto_payment_info = await api_client.get_user_auto_payment_info(telegram_id)
+            current_state = auto_payment_info.get('enabled', True) if auto_payment_info else True
+            
+            # Обновляем UI с текущим состоянием
+            try:
+                subscription_info = await api_client.get_user_subscription_status(telegram_id)
+                if subscription_info and subscription_info.get('success') and subscription_info.get('days_remaining', 0) > 0:
+                    await show_active_subscription_info_with_autopay_state(callback.message, subscription_info, telegram_id, current_state)
+                else:
+                    await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=current_state)
+            except Exception as e:
+                logger.error(f"Ошибка обновления UI после ошибки включения автопродления: {e}")
+                # Если не удалось обновить UI, отправляем сообщение об ошибке
+                await callback.message.answer(
+                    f"❌ Не удалось включить автопродление: {error_msg}",
+                    reply_markup=get_back_to_menu_keyboard()
+                )
             
     except Exception as e:
-        logger.error(f"Error toggling autopay on: {e}")
-        await callback.answer("❌ Произошла ошибка")
+        telegram_id = callback.from_user.id if hasattr(callback, 'from_user') else 'unknown'
+        logger.error(f"Error toggling autopay on for user {telegram_id}: {e}", exc_info=True)
+        await callback.answer("❌ Произошла ошибка при включении автопродления")
+        
+        # Пытаемся вернуться в безопасное состояние
+        try:
+            await callback.message.answer(
+                "❌ Произошла ошибка при включении автопродления. Пожалуйста, попробуйте позже.",
+                reply_markup=get_back_to_menu_keyboard()
+            )
+        except Exception as ui_error:
+            logger.error(f"Failed to show error message after autopay toggle error: {ui_error}")
+        await callback.answer("❌ Произошла ошибка при включении автопродления")
 
 
 @router.callback_query(F.data == "toggle_autopay_off")  
@@ -931,10 +1007,12 @@ async def handle_toggle_autopay_off(callback: CallbackQuery):
         telegram_id = callback.from_user.id
         api_client = SimpleAPIClient()
         
+        # Вызываем API для отключения автопродления
         result = await api_client.cancel_user_auto_payment(telegram_id)
         
         if result and result.get('success'):
             await callback.answer("✅ Автопродление отключено")
+            
             # Получаем обновленную информацию о подписке
             subscription_info = await api_client.get_user_subscription_status(telegram_id)
             
@@ -950,12 +1028,16 @@ async def handle_toggle_autopay_off(callback: CallbackQuery):
             else:
                 # Если не удалось получить статус подписки, обновляем с отключенным автопродлением
                 await show_subscription_plans_selection_with_new_state(callback.message, autopay_enabled=False)
+                logger.warning(f"Failed to get subscription status for user {telegram_id} after disabling autopay")
         else:
-            await callback.answer("❌ Ошибка отключения автопродления")
+            # Улучшенная обработка ошибок с детальной информацией
+            error_msg = result.get('message', 'Неизвестная ошибка') if result else 'Ошибка соединения с сервером'
+            logger.error(f"Failed to disable autopay for user {telegram_id}: {error_msg}")
+            await callback.answer(f"❌ Ошибка отключения автопродления: {error_msg}")
             
     except Exception as e:
-        logger.error(f"Error toggling autopay off: {e}")
-        await callback.answer("❌ Произошла ошибка")
+        logger.error(f"Error toggling autopay off for user {telegram_id}: {e}", exc_info=True)
+        await callback.answer("❌ Произошла ошибка при отключении автопродления")
 
 
 async def show_subscription_plans_selection_with_new_state(message: Message, autopay_enabled: bool):

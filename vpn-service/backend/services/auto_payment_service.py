@@ -136,12 +136,18 @@ class AutoPaymentService:
             user = result.scalar_one_or_none()
             
             if not user:
+                logger.warning(f"User with ID {user_id} not found when disabling auto payment")
                 return {
                     'success': False,
-                    'message': 'Пользователь не найден'
+                    'message': 'Пользователь не найден',
+                    'code': 'user_not_found'
                 }
             
-            # Отключаем настройку автоплатежа
+            # Проверяем текущий статус подписки (только для логирования)
+            has_subscription = user.has_active_subscription
+            logger.info(f"Disabling auto payment for user {user_id} with subscription status: {user.subscription_status}, has_active_subscription: {has_subscription}")
+            
+            # Отключаем настройку автоплатежа независимо от статуса подписки
             user.autopay_enabled = False
             await self.db.commit()
             
@@ -149,15 +155,19 @@ class AutoPaymentService:
             
             return {
                 'success': True,
-                'message': 'Автоплатеж отключен'
+                'message': 'Автоплатеж отключен',
+                'autopay_enabled': False,
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
                 
         except Exception as e:
-            logger.error(f"Ошибка отключения автоплатежа: {e}")
+            logger.error(f"Ошибка отключения автоплатежа для пользователя {user_id}: {e}", exc_info=True)
             await self.db.rollback()
             return {
                 'success': False,
-                'message': 'Ошибка отключения автоплатежа'
+                'message': 'Ошибка отключения автоплатежа',
+                'error': str(e),
+                'code': 'db_error'
             }
     
     async def enable_auto_payment(self, user_id: int) -> Dict[str, Any]:
@@ -178,12 +188,18 @@ class AutoPaymentService:
             user = result.scalar_one_or_none()
             
             if not user:
+                logger.warning(f"User with ID {user_id} not found when enabling auto payment")
                 return {
                     'success': False,
-                    'message': 'Пользователь не найден'
+                    'message': 'Пользователь не найден',
+                    'code': 'user_not_found'
                 }
             
-            # Сохраняем настройку автоплатежа
+            # Проверяем текущий статус подписки (только для логирования)
+            has_subscription = user.has_active_subscription
+            logger.info(f"Enabling auto payment for user {user_id} with subscription status: {user.subscription_status}, has_active_subscription: {has_subscription}")
+            
+            # Сохраняем настройку автоплатежа независимо от статуса подписки
             user.autopay_enabled = True
             await self.db.commit()
             
@@ -191,26 +207,31 @@ class AutoPaymentService:
             
             return {
                 'success': True,
-                'message': 'Автоплатеж включен'
+                'message': 'Автоплатеж включен',
+                'autopay_enabled': True,
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
                 
         except Exception as e:
-            logger.error(f"Ошибка включения автоплатежа: {e}")
+            logger.error(f"Ошибка включения автоплатежа для пользователя {user_id}: {e}", exc_info=True)
             await self.db.rollback()
             return {
                 'success': False,
-                'message': 'Ошибка включения автоплатежа'
+                'message': 'Ошибка включения автоплатежа',
+                'error': str(e),
+                'code': 'db_error'
             }
 
-    async def get_user_auto_payment_info(self, user_id: int) -> Dict[str, Any]:
+    async def update_user_auto_payment(self, user_id: int, enabled: bool) -> Dict[str, Any]:
         """
-        Получение информации об автоплатеже пользователя
+        Обновление настройки автоплатежа пользователя независимо от статуса подписки
         
         Args:
             user_id: ID пользователя
+            enabled: Статус автоплатежа (True - включен, False - отключен)
             
         Returns:
-            Информация об автоплатеже
+            Результат обновления настройки
         """
         try:
             # Находим пользователя
@@ -220,16 +241,131 @@ class AutoPaymentService:
             user = result.scalar_one_or_none()
             
             if not user:
-                return {'enabled': False, 'message': 'Пользователь не найден'}
+                logger.warning(f"User with ID {user_id} not found when updating auto payment preference")
+                return {
+                    'success': False,
+                    'message': 'Пользователь не найден',
+                    'code': 'user_not_found'
+                }
+            
+            # Обновляем настройку автоплатежа независимо от статуса подписки
+            previous_value = user.autopay_enabled
+            user.autopay_enabled = enabled
+            
+            # Логируем информацию о статусе подписки для отладки
+            subscription_status = user.subscription_status
+            has_active_subscription = user.has_active_subscription
+            logger.info(
+                f"Updating autopay preference for user {user_id}: {previous_value} -> {enabled}, "
+                f"subscription_status: {subscription_status}, has_active_subscription: {has_active_subscription}"
+            )
+            
+            # Сохраняем изменения
+            try:
+                await self.db.commit()
+                logger.info(f"✅ Настройка автоплатежа успешно обновлена для пользователя {user_id}")
+            except Exception as db_error:
+                # Детальное логирование ошибок базы данных
+                logger.error(f"❌ Ошибка базы данных при обновлении настройки автоплатежа: {db_error}", exc_info=True)
+                await self.db.rollback()
+                raise  # Пробрасываем ошибку для обработки во внешнем блоке try/except
             
             return {
-                'enabled': user.autopay_enabled,
-                'message': 'Включен' if user.autopay_enabled else 'Отключен'
+                'success': True,
+                'message': 'Автоплатеж включен' if enabled else 'Автоплатеж отключен',
+                'autopay_enabled': enabled,
+                'previous_value': previous_value,
+                'subscription_status': subscription_status,
+                'has_active_subscription': has_active_subscription,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+                
+        except Exception as e:
+            # Откатываем изменения в случае ошибки
+            try:
+                await self.db.rollback()
+                logger.info("✅ Транзакция успешно отменена после ошибки")
+            except Exception as rollback_error:
+                logger.error(f"❌ Ошибка при откате транзакции: {rollback_error}", exc_info=True)
+            
+            logger.error(f"❌ Ошибка обновления настройки автоплатежа для пользователя {user_id}: {e}", exc_info=True)
+            return {
+                'success': False,
+                'message': 'Ошибка обновления настройки автоплатежа',
+                'error': str(e),
+                'code': 'db_error'
+            }
+    
+    async def get_user_auto_payment_info(self, user_id: int) -> Dict[str, Any]:
+        """
+        Получение информации об автоплатеже пользователя независимо от статуса подписки
+        
+        Args:
+            user_id: ID пользователя
+            
+        Returns:
+            Информация об автоплатеже с fallback на значение по умолчанию
+        """
+        # Значение по умолчанию согласно требованиям
+        DEFAULT_AUTOPAY_ENABLED = True
+        
+        try:
+            # Находим пользователя
+            result = await self.db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                logger.warning(f"User with ID {user_id} not found when getting auto payment info")
+                # Возвращаем значение по умолчанию, если пользователь не найден
+                return {
+                    'enabled': DEFAULT_AUTOPAY_ENABLED,
+                    'message': 'Пользователь не найден, используется значение по умолчанию',
+                    'is_default': True,
+                    'code': 'user_not_found',
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+            
+            # Получаем настройку автоплатежа независимо от статуса подписки
+            # Если значение None, используем значение по умолчанию
+            autopay_enabled = user.autopay_enabled if user.autopay_enabled is not None else DEFAULT_AUTOPAY_ENABLED
+            is_default_value = user.autopay_enabled is None
+            
+            # Проверяем наличие активной подписки (только для информации)
+            has_subscription = user.has_active_subscription
+            
+            # Улучшенное логирование для отладки
+            logger.info(
+                f"Auto payment info for user {user_id}: enabled={autopay_enabled}, "
+                f"is_default={is_default_value}, has_subscription={has_subscription}, "
+                f"subscription_status={user.subscription_status}, "
+                f"raw_autopay_value={user.autopay_enabled}"
+            )
+            
+            return {
+                'enabled': autopay_enabled,
+                'message': 'Включен' if autopay_enabled else 'Отключен',
+                'has_subscription': has_subscription,
+                'is_default': is_default_value,
+                'subscription_status': str(user.subscription_status),
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
         except Exception as e:
-            logger.error(f"Ошибка получения информации об автоплатеже: {e}")
-            return {'enabled': False, 'message': 'Ошибка получения информации'}
+            error_msg = str(e)
+            logger.error(f"Ошибка получения информации об автоплатеже для пользователя {user_id}: {error_msg}", exc_info=True)
+            
+            # Возвращаем значение по умолчанию в случае ошибки (как указано в требованиях)
+            return {
+                'enabled': DEFAULT_AUTOPAY_ENABLED,
+                'message': 'Ошибка получения информации, используется значение по умолчанию',
+                'error': error_msg,
+                'is_default': True,
+                'code': 'db_error',
+                'has_subscription': False,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
     
     async def _get_payment(self, payment_id: int) -> Optional[Payment]:
         """Получение платежа по ID"""
@@ -261,6 +397,51 @@ class AutoPaymentService:
             )
         )
         return result.scalar_one_or_none()
+    
+    async def get_user_auto_payment_info_by_telegram_id(self, telegram_id: int) -> Dict[str, Any]:
+        """
+        Получение информации об автоплатеже пользователя по telegram_id
+        
+        Args:
+            telegram_id: Telegram ID пользователя
+            
+        Returns:
+            Информация об автоплатеже с fallback на значение по умолчанию
+        """
+        try:
+            # Находим пользователя по telegram_id
+            result = await self.db.execute(
+                select(User).where(User.telegram_id == telegram_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                logger.warning(f"User with Telegram ID {telegram_id} not found when getting auto payment info")
+                # Возвращаем значение по умолчанию, если пользователь не найден
+                return {
+                    'enabled': True,  # Значение по умолчанию
+                    'message': 'Пользователь не найден, используется значение по умолчанию',
+                    'is_default': True,
+                    'code': 'user_not_found',
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+            
+            # Используем существующий метод для получения информации по user_id
+            return await self.get_user_auto_payment_info(user.id)
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Ошибка получения информации об автоплатеже для пользователя с Telegram ID {telegram_id}: {error_msg}", exc_info=True)
+            
+            # Возвращаем значение по умолчанию в случае ошибки
+            return {
+                'enabled': True,  # Значение по умолчанию
+                'message': 'Ошибка получения информации, используется значение по умолчанию',
+                'error': error_msg,
+                'is_default': True,
+                'code': 'db_error',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
     
     def _get_period_days(self, subscription_type: SubscriptionType) -> int:
         """Получение периода в днях для типа подписки"""
