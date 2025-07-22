@@ -2405,6 +2405,7 @@ async def admin_user_profile_page(
         
         return templates.TemplateResponse("admin/user_profile.html", {
             "request": request,
+            "current_admin": current_admin,
             "title": f"Профиль пользователя {user.username or user.first_name or f'ID {user.id}'}",
             "user": user,
             "payments": payments_data,
@@ -3502,3 +3503,177 @@ async def check_user_deletion_safety(
                     user_id=user_id, 
                     error=str(e))
         raise HTTPException(status_code=500, detail="Ошибка проверки безопасности удаления")
+
+
+# =============================================================================
+# APP SETTINGS MANAGEMENT
+# =============================================================================
+
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(
+    request: Request, 
+    admin=Depends(get_current_admin), 
+    db: AsyncSession = Depends(get_db)
+):
+    """Страница настроек приложения"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        # Получаем текущие настройки
+        settings = await AppSettingsService.get_settings(db)
+        
+        context = {
+            "request": request,
+            "current_admin": admin,
+            "settings": settings,
+            "page_title": "Настройки приложения"
+        }
+        
+        return templates.TemplateResponse("admin/settings.html", context)
+        
+    except Exception as e:
+        logger.error("Error loading settings page", error=str(e))
+        import traceback
+        logger.error("Full traceback:", error=traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Ошибка загрузки страницы настроек")
+
+
+@router.post("/settings")
+async def update_settings(
+    request: Request,
+    admin=Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Обновление настроек приложения"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        # Получаем данные формы
+        form_data = await request.form()
+        
+        # Преобразуем данные формы в словарь
+        settings_data = {}
+        for key, value in form_data.items():
+            if key == 'trial_enabled':
+                settings_data[key] = value == 'on'
+            elif key in ['trial_days', 'trial_max_per_user', 'token_expire_minutes']:
+                try:
+                    settings_data[key] = int(value) if value else 0
+                except ValueError:
+                    continue
+            else:
+                settings_data[key] = value
+        
+        # Обновляем настройки
+        updated_settings = await AppSettingsService.update_settings(db, settings_data)
+        
+        # Добавляем сообщение об успехе
+        success_message = "Настройки успешно обновлены"
+        
+        context = {
+            "request": request,
+            "current_admin": admin,
+            "settings": updated_settings,
+            "page_title": "Настройки приложения",
+            "success_message": success_message
+        }
+        
+        return templates.TemplateResponse("admin/settings.html", context)
+        
+    except Exception as e:
+        logger.error("Error updating settings", error=str(e))
+        
+        # Возвращаем страницу с ошибкой
+        from services.app_settings_service import AppSettingsService
+        settings = await AppSettingsService.get_settings(db)
+        
+        context = {
+            "request": request,
+            "current_admin": admin,
+            "settings": settings,
+            "page_title": "Настройки приложения",
+            "error_message": f"Ошибка обновления настроек: {str(e)}"
+        }
+        
+        return templates.TemplateResponse("admin/settings.html", context)
+
+
+@router.post("/settings/reset")
+async def reset_settings(
+    request: Request,
+    admin=Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Сброс настроек к значениям по умолчанию"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        # Сбрасываем настройки
+        default_settings = await AppSettingsService.reset_to_defaults(db)
+        
+        # Добавляем сообщение об успехе
+        success_message = "Настройки сброшены к значениям по умолчанию"
+        
+        context = {
+            "request": request,
+            "admin": admin,
+            "settings": default_settings,
+            "page_title": "Настройки приложения",
+            "success_message": success_message
+        }
+        
+        return templates.TemplateResponse("admin/settings.html", context)
+        
+    except Exception as e:
+        logger.error("Error resetting settings", error=str(e))
+        
+        # Возвращаем страницу с ошибкой
+        from services.app_settings_service import AppSettingsService
+        settings = await AppSettingsService.get_settings(db)
+        
+        context = {
+            "request": request,
+            "admin": admin,
+            "settings": settings,
+            "page_title": "Настройки приложения",
+            "error_message": f"Ошибка сброса настроек: {str(e)}"
+        }
+        
+        return templates.TemplateResponse("admin/settings.html", context)
+
+
+@router.get("/settings/api")
+async def get_settings_api(
+    admin=Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """API для получения настроек (JSON)"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        settings = await AppSettingsService.get_settings(db)
+        
+        return {
+            "success": True,
+            "settings": {
+                "id": settings.id,
+                "site_name": settings.site_name,
+                "site_domain": settings.site_domain,
+                "site_description": settings.site_description,
+                "trial_enabled": settings.trial_enabled,
+                "trial_days": settings.trial_days,
+                "trial_max_per_user": settings.trial_max_per_user,
+                "token_expire_minutes": settings.token_expire_minutes,
+                "admin_telegram_ids": settings.admin_telegram_ids_list,
+                "admin_usernames": settings.admin_usernames_list,
+                "telegram_bot_token": settings.telegram_bot_token,
+                "bot_welcome_message": settings.bot_welcome_message,
+                "bot_help_message": settings.bot_help_message,
+                "bot_apps_message": settings.bot_apps_message,
+                "updated_at": settings.updated_at.isoformat() if settings.updated_at else None
+            }
+        }
+        
+    except Exception as e:
+        logger.error("Error getting settings via API", error=str(e))
+        raise HTTPException(status_code=500, detail="Ошибка получения настроек")

@@ -13,7 +13,22 @@ class NotificationService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.bot_token = self.settings.telegram_bot_token
+        self.bot_token = None  # Будет загружаться из БД по требованию
+        
+    async def _get_bot_token(self):
+        """Получить токен бота из настроек БД"""
+        if self.bot_token is None:
+            try:
+                from config.database import get_db
+                from services.app_settings_service import AppSettingsService
+                async with get_db() as db:
+                    settings = await AppSettingsService.get_settings(db)
+                    self.bot_token = settings.telegram_bot_token
+            except Exception as e:
+                print(f"Error loading bot token from DB: {e}")
+                # Fallback к значению по умолчанию
+                self.bot_token = "8019787780:AAGy5cBWpQ09yvtDE3sp0AMY7kZyRYbSJqU"
+        return self.bot_token
         
     async def send_payment_success_notification(
         self, 
@@ -224,11 +239,12 @@ class NotificationService:
     
     async def _send_telegram_message(self, telegram_id: int, message: str):
         """Отправка сообщения через Telegram Bot API"""
-        if not self.bot_token:
+        bot_token = await self._get_bot_token()
+        if not bot_token:
             logger.warning("Bot token not configured, skipping notification")
             return
         
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         
         payload = {
             "chat_id": telegram_id,

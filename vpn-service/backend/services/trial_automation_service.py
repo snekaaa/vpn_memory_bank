@@ -331,21 +331,54 @@ def get_default_trial_config() -> TrialConfig:
     )
 
 
+async def get_trial_config_from_db(db_session: AsyncSession) -> TrialConfig:
+    """
+    Получение конфигурации триального периода из базы данных
+    
+    Args:
+        db_session: Database session
+        
+    Returns:
+        Конфигурация с настройками из базы данных
+    """
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        settings = await AppSettingsService.get_settings(db_session)
+        
+        return TrialConfig(
+            trial_days=settings.trial_days,
+            trial_amount=0.0,
+            trial_description="Автоматический триальный период - {days} дней",
+            enabled=settings.trial_enabled,
+            max_trials_per_user=settings.trial_max_per_user,
+            admin_user="auto_trial_system"
+        )
+    except Exception as e:
+        logger.error("Failed to get trial config from DB, using default", error=str(e))
+        return get_default_trial_config()
+
+
 async def get_trial_automation_service(
     payment_service: PaymentManagementService,
-    config: Optional[TrialConfig] = None
+    config: Optional[TrialConfig] = None,
+    db_session: Optional[AsyncSession] = None
 ) -> TrialAutomationService:
     """
     Factory function для получения TrialAutomationService
     
     Args:
         payment_service: Сервис управления платежами
-        config: Конфигурация триала (если не указана, используется по умолчанию)
+        config: Конфигурация триала (если не указана, берется из БД или по умолчанию)
+        db_session: Database session для получения настроек из БД
         
     Returns:
         Экземпляр TrialAutomationService
     """
     if config is None:
-        config = get_default_trial_config()
+        if db_session is not None:
+            config = await get_trial_config_from_db(db_session)
+        else:
+            config = get_default_trial_config()
     
     return TrialAutomationService(payment_service, config) 

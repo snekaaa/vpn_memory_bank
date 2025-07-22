@@ -6,21 +6,16 @@ import os
 class Settings(BaseSettings):
     """Настройки приложения"""
     
-    # Основные настройки
-    app_name: str = "VPN Service"
+    # Системные настройки (остаются в ENV)
     debug: bool = False
     environment: str = "development"
     
     # База данных
     database_url: str = os.environ.get("DATABASE_URL", "postgresql+asyncpg://vpnuser:vpnpass@localhost/vpndb")
-    postgres_db: str = "vpndb"
-    postgres_user: str = "vpnuser"
-    postgres_password: str = "vpnpass"
     
-    # Безопасность
+    # Безопасность (критично для безопасности - остается в ENV)
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
     
     # ЮKassa
     yookassa_shop_id: Optional[str] = None
@@ -41,12 +36,12 @@ class Settings(BaseSettings):
     # x3ui_server_ip убран - используем ноды из базы данных
     x3ui_default_inbound_id: int = 2  # Используется как fallback
     
-    # Telegram Bot
-    telegram_bot_token: str = "8062277246:AAESIC7inc1vnM6jXs3R6ZrfUh3m3FW-lHs"
-    telegram_webhook_url: Optional[str] = None
-    
-    # Домен приложения
-    app_domain: str = "https://raccoon-topical-ocelot.ngrok-free.app"
+    # Настройки теперь в БД через app_settings:
+    # - app_name → app_settings.site_name
+    # - telegram_bot_token → app_settings.telegram_bot_token  
+    # - access_token_expire_minutes → app_settings.token_expire_minutes
+    # - admin_telegram_ids → app_settings.admin_telegram_ids
+    # - admin_usernames → app_settings.admin_usernames
     
     # Redis (для Celery)
     redis_url: str = "redis://localhost:6379/0"

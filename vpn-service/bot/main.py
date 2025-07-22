@@ -4,6 +4,7 @@
 
 import asyncio
 import structlog
+import asyncpg
 from aiogram import Bot, Dispatcher, Router
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
@@ -29,6 +30,36 @@ print("DEBUG: Payments handler imported")
 
 logger = structlog.get_logger(__name__)
 print("DEBUG: Logger configured")
+
+async def get_bot_token_from_db():
+    """Получить токен бота из БД настроек"""
+    try:
+        # Подключаемся к БД
+        conn = await asyncpg.connect(
+            host='db',
+            port=5432,
+            user='vpn_user',
+            password='vpn_password',
+            database='vpn_db'
+        )
+        
+        # Получаем токен из app_settings
+        result = await conn.fetchval(
+            "SELECT telegram_bot_token FROM app_settings WHERE id = 1"
+        )
+        
+        await conn.close()
+        
+        if result:
+            return result
+        else:
+            # Fallback к значению по умолчанию
+            return "8019787780:AAGy5cBWpQ09yvtDE3sp0AMY7kZyRYbSJqU"
+            
+    except Exception as e:
+        print(f"Error getting bot token from DB: {e}")
+        # Fallback к значению по умолчанию
+        return "8019787780:AAGy5cBWpQ09yvtDE3sp0AMY7kZyRYbSJqU"
 
 async def on_startup(bot: Bot):
     """
@@ -84,13 +115,19 @@ async def main():
     settings = get_settings()
     print("DEBUG: Settings obtained")
     
+    # Получаем токен бота из БД настроек
+    bot_token = await get_bot_token_from_db()
+    if not bot_token:
+        logger.error("Bot token not found in database settings")
+        raise ValueError("Bot token not configured in database settings")
+    
     # Проверяем конфигурацию
     logger.info("Bot configuration validated", 
-               TELEGRAM_TOKEN="***" if settings.TELEGRAM_TOKEN else "MISSING")
+               TELEGRAM_TOKEN="***" if bot_token else "MISSING")
     print("DEBUG: Configuration validated")
     
     # Инициализируем бота и диспетчер с хранилищем состояний
-    bot = Bot(token=settings.TELEGRAM_TOKEN)
+    bot = Bot(token=bot_token)
     print("DEBUG: Bot created")
     
     dp = Dispatcher(storage=MemoryStorage())

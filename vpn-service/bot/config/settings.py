@@ -79,25 +79,29 @@ class Settings(BaseSettings):
     admin_log_enabled: bool = True
     admin_session_timeout: int = 3600  # 1 hour
 
+    # ПРИМЕЧАНИЕ: admin_telegram_ids и admin_usernames теперь берутся из БД
+    # через app_settings. Эти методы оставлены для совместимости со старым кодом
+    # и используют fallback значения если БД недоступна
+    
     @property
     def admin_telegram_ids(self) -> List[int]:
-        """Получить список админских Telegram ID"""
+        """Получить список админских Telegram ID (fallback из ENV)"""
         env_admin_ids = os.getenv('ADMIN_TELEGRAM_IDS')
         if env_admin_ids:
             try:
                 return [int(id.strip()) for id in env_admin_ids.split(',') if id.strip()]
             except ValueError:
                 pass
-        # Дефолтные значения
+        # Дефолтные значения (если БД недоступна)
         return [352313872]  # av_nosov admin ID
 
     @property
     def admin_usernames(self) -> List[str]:
-        """Получить список админских username"""
+        """Получить список админских username (fallback из ENV)"""
         env_admin_usernames = os.getenv('ADMIN_USERNAMES')
         if env_admin_usernames:
             return [username.strip() for username in env_admin_usernames.split(',') if username.strip()]
-        # Дефолтные значения
+        # Дефолтные значения (если БД недоступна)
         return ["av_nosov", "seo2seo"]
     
     model_config = {
