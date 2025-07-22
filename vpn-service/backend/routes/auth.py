@@ -16,17 +16,33 @@ security = HTTPBearer()
 logger = structlog.get_logger(__name__)
 settings = get_settings()
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, expire_minutes: Optional[int] = None):
     """Создание JWT токена"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
+    elif expire_minutes:
+        expire = datetime.utcnow() + timedelta(minutes=expire_minutes)
     else:
+        # Fallback к настройкам из ENV
         expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
     return encoded_jwt
+
+async def create_access_token_with_db_settings(data: dict, db: AsyncSession, expires_delta: Optional[timedelta] = None):
+    """Создание JWT токена с настройками из БД"""
+    from services.app_settings_service import AppSettingsService
+    
+    if expires_delta:
+        return create_access_token(data, expires_delta=expires_delta)
+    
+    # Получаем настройки из БД
+    app_settings = await AppSettingsService.get_settings(db)
+    expire_minutes = app_settings.token_expire_minutes
+    
+    return create_access_token(data, expire_minutes=expire_minutes)
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),

@@ -19,11 +19,29 @@ logger = structlog.get_logger(__name__)
 
 start_router = Router()
 
-# Admin Telegram IDs для security check
-ADMIN_TELEGRAM_IDS = [int(x) for x in os.getenv('ADMIN_TELEGRAM_IDS', '').split(',') if x.strip()]
-
-def _is_admin_user(user_id: int) -> bool:
-    return user_id in ADMIN_TELEGRAM_IDS
+async def _is_admin_user(user_id: int) -> bool:
+    """Проверка является ли пользователь админом через настройки из БД"""
+    try:
+        # Импортируем здесь, чтобы избежать циклических импортов
+        import sys
+        import os
+        
+        # Добавляем backend в path
+        backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
+        if backend_path not in sys.path:
+            sys.path.insert(0, backend_path)
+        
+        from config.database import get_db_session
+        from services.app_settings_service import AppSettingsService
+        
+        async with get_db_session() as session:
+            is_admin = await AppSettingsService.is_admin_telegram_id(session, user_id)
+            return is_admin
+    except Exception as e:
+        logger.error("Error checking admin status", user_id=user_id, error=str(e))
+        # Fallback к ENV переменной
+        admin_ids = [int(x) for x in os.getenv('ADMIN_TELEGRAM_IDS', '').split(',') if x.strip()]
+        return user_id in admin_ids
 
 @start_router.message(Command("start"))
 async def start_command(message: types.Message, state: FSMContext):
@@ -36,17 +54,48 @@ async def start_command(message: types.Message, state: FSMContext):
             "last_name": message.from_user.last_name,
             "language_code": message.from_user.language_code
         }
-        is_admin = _is_admin_user(telegram_id)
+        is_admin = await _is_admin_user(telegram_id)
         logger.info("Authorization starting", telegram_id=telegram_id, username=user_data.get("username"), is_admin=is_admin)
         
         first_name = message.from_user.first_name if message.from_user.first_name else "друг"
-        welcome_msg = (
-            f"👋 *{first_name}, добро пожаловать!*\n\n"
-            f"🔓 Получите свободный доступ к интернету\n"
-            f"💳 Выберите подписку для получения VPN ключей\n"
-            f"🔑 Управляйте своими ключами\n\n"
-            f"Выберите действие в меню ниже:"
-        )
+        
+        # Получаем приветственное сообщение из настроек БД
+        try:
+            import sys
+            import os
+            
+            # Добавляем backend в path
+            backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
+            if backend_path not in sys.path:
+                sys.path.insert(0, backend_path)
+            
+            from config.database import get_db_session
+            from services.app_settings_service import AppSettingsService
+            
+            async with get_db_session() as session:
+                app_settings = await AppSettingsService.get_settings(session)
+                if app_settings.bot_welcome_message:
+                    # Используем настройку из БД, подставляя имя пользователя
+                    welcome_msg = app_settings.bot_welcome_message.format(first_name=first_name)
+                else:
+                    # Fallback к сообщению по умолчанию
+                    welcome_msg = (
+                        f"👋 *{first_name}, добро пожаловать!*\n\n"
+                        f"🔓 Получите свободный доступ к интернету\n"
+                        f"💳 Выберите подписку для получения VPN ключей\n"
+                        f"🔑 Управляйте своими ключами\n\n"
+                        f"Выберите действие в меню ниже:"
+                    )
+        except Exception as e:
+            logger.error("Error getting welcome message from DB", error=str(e))
+            # Fallback к сообщению по умолчанию
+            welcome_msg = (
+                f"👋 *{first_name}, добро пожаловать!*\n\n"
+                f"🔓 Получите свободный доступ к интернету\n"
+                f"💳 Выберите подписку для получения VPN ключей\n"
+                f"🔑 Управляйте своими ключами\n\n"
+                f"Выберите действие в меню ниже:"
+            )
         
         await send_main_menu(message, telegram_id, welcome_msg)
         logger.info("Authorization successful", telegram_id=telegram_id, is_admin=is_admin)

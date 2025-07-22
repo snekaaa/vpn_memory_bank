@@ -83,9 +83,9 @@ class AppSettingsService:
             if hasattr(settings, key):
                 # Специальная обработка для списков admin IDs/usernames
                 if key == 'admin_telegram_ids' and isinstance(value, str):
-                    # Парсим строку "123,456" в JSON массив
+                    # Парсим строку "123,456" в JSON массив строк
                     try:
-                        ids = [int(x.strip()) for x in value.split(',') if x.strip()]
+                        ids = [x.strip() for x in value.split(',') if x.strip()]
                         settings.admin_telegram_ids = json.dumps(ids)
                     except ValueError:
                         logger.warning(f"Invalid admin_telegram_ids format: {value}")
@@ -157,7 +157,8 @@ class AppSettingsService:
         """Проверить является ли telegram_id админским"""
         settings = await AppSettingsService.get_settings(db)
         admin_ids = settings.admin_telegram_ids_list
-        return telegram_id in admin_ids
+        # Преобразуем telegram_id в строку для сравнения
+        return str(telegram_id) in admin_ids
     
     @staticmethod
     async def is_admin_username(db: AsyncSession, username: str) -> bool:

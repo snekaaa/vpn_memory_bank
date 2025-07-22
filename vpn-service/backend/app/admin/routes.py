@@ -93,6 +93,32 @@ templates = Jinja2Templates(directory=["app/templates"])
 # Настройка логгера
 logger = structlog.get_logger(__name__)
 
+async def get_template_context(request, db: AsyncSession, **kwargs):
+    """Получить базовый контекст для всех шаблонов с настройками сайта"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        app_settings = await AppSettingsService.get_settings(db)
+        
+        base_context = {
+            "request": request,
+            "site_name": app_settings.site_name,
+            "site_domain": app_settings.site_domain,
+            "site_description": app_settings.site_description,
+        }
+        base_context.update(kwargs)
+        return base_context
+    except Exception as e:
+        logger.error("Error getting template context", error=str(e))
+        # Fallback к базовому контексту
+        base_context = {
+            "request": request,
+            "site_name": "VPN Service",
+            "site_domain": None,
+            "site_description": None,
+        }
+        base_context.update(kwargs)
+        return base_context
+
 
 # =============================================================================
 # PYDANTIC МОДЕЛИ ДЛЯ ПЛАТЕЖНЫХ ПРОВАЙДЕРОВ
@@ -2687,8 +2713,9 @@ async def admin_edit_payment_provider_page(
         "success_rate": (successful_payments / total_payments * 100) if total_payments > 0 else 0.0
     }
     
-    from config.settings import get_settings
-    settings = get_settings()
+    # Получаем настройки из БД
+    from services.app_settings_service import AppSettingsService
+    app_settings = await AppSettingsService.get_settings(db)
     
     return templates.TemplateResponse("admin/payment_providers/edit.html", {
         "request": request,
@@ -2700,7 +2727,7 @@ async def admin_edit_payment_provider_page(
             for t in PaymentProviderType
         ],
         "masked_config": provider.mask_sensitive_config(),
-        "app_domain": settings.app_domain,
+        "app_domain": app_settings.site_domain,
         "_get_provider_description": _get_provider_description
     })
 
@@ -3553,6 +3580,10 @@ async def update_settings(
         
         # Преобразуем данные формы в словарь
         settings_data = {}
+        
+        # Явно обрабатываем чекбокс trial_enabled (он отсутствует в форме, если не отмечен)
+        settings_data['trial_enabled'] = 'trial_enabled' in form_data and form_data['trial_enabled'] == 'on'
+        
         for key, value in form_data.items():
             if key == 'trial_enabled':
                 settings_data[key] = value == 'on'

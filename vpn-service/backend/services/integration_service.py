@@ -62,6 +62,11 @@ class IntegrationService:
                 from models.user import UserSubscriptionStatus
                 from datetime import datetime, timezone, timedelta
                 from services.trial_automation_service import TrialAutomationService
+                from services.app_settings_service import AppSettingsService
+                
+                # Получаем настройки триала из БД
+                app_settings = await AppSettingsService.get_settings(session)
+                trial_days = app_settings.trial_days if app_settings.trial_enabled else 0
                 
                 new_user = User(
                     telegram_id=telegram_id,
@@ -71,8 +76,8 @@ class IntegrationService:
                     language_code=user_data.get("language_code", "ru"),
                     is_active=True,
                     is_blocked=False,
-                    subscription_status=UserSubscriptionStatus.active,  # Устанавливаем активную подписку
-                    valid_until=datetime.now(timezone.utc) + timedelta(days=7)  # 7 дней триала по умолчанию
+                    subscription_status=UserSubscriptionStatus.active if trial_days > 0 else UserSubscriptionStatus.none,
+                    valid_until=datetime.now(timezone.utc) + timedelta(days=trial_days) if trial_days > 0 else None
                 )
                 
                 session.add(new_user)

@@ -54,15 +54,15 @@ class AppSettings(Base):
     )
     
     @property 
-    def admin_telegram_ids_list(self) -> List[int]:
-        """Получить список admin telegram IDs как список чисел"""
+    def admin_telegram_ids_list(self) -> List[str]:
+        """Получить список admin telegram IDs как список строк"""
         try:
             return json.loads(self.admin_telegram_ids) if self.admin_telegram_ids else []
         except (json.JSONDecodeError, TypeError):
             return []
     
     @admin_telegram_ids_list.setter
-    def admin_telegram_ids_list(self, value: List[int]):
+    def admin_telegram_ids_list(self, value: List[str]):
         """Установить список admin telegram IDs"""
         self.admin_telegram_ids = json.dumps(value)
     
