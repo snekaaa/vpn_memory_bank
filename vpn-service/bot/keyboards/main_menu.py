@@ -320,6 +320,28 @@ async def get_user_subscription_days(telegram_id: int) -> int:
         user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
         
         if not user_data or not user_data.get('success'):
+            logger.warning("❌ Пользователь не найден в API, создаем нового", telegram_id=telegram_id)
+            
+            # Создаем нового пользователя через full-cycle API
+            try:
+                from services.vpn_manager_x3ui import vpn_manager_x3ui as vpn_manager
+                
+                # Создаем пользователя через VPN manager
+                user_result = await vpn_manager.get_or_create_user_key(telegram_id, "", "")
+                
+                if user_result and user_result.get('success'):
+                    logger.info("✅ Новый пользователь создан", telegram_id=telegram_id)
+                    # Повторно запрашиваем данные пользователя
+                    user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
+                else:
+                    logger.error("❌ Не удалось создать пользователя", telegram_id=telegram_id, error=user_result.get('error', 'Unknown error'))
+                    return 0
+                    
+            except Exception as create_error:
+                logger.error("❌ Ошибка создания пользователя", telegram_id=telegram_id, error=str(create_error))
+                return 0
+        
+        if not user_data or not user_data.get('success'):
             logger.warning("❌ Пользователь не найден в API", telegram_id=telegram_id)
             return 0
         
