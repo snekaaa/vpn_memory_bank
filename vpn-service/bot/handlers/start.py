@@ -14,6 +14,7 @@ from templates.messages import (
 from services.vpn_manager_x3ui import vpn_manager_x3ui as vpn_manager
 import structlog
 import os
+import asyncio
 
 logger = structlog.get_logger(__name__)
 
@@ -54,51 +55,30 @@ async def start_command(message: types.Message, state: FSMContext):
             "last_name": message.from_user.last_name,
             "language_code": message.from_user.language_code
         }
-        is_admin = await _is_admin_user(telegram_id)
+        
+        # Быстрая проверка админского статуса через ENV (без БД)
+        admin_ids = [int(x) for x in os.getenv('ADMIN_TELEGRAM_IDS', '').split(',') if x.strip()]
+        is_admin = telegram_id in admin_ids
+        
         logger.info("Authorization starting", telegram_id=telegram_id, username=user_data.get("username"), is_admin=is_admin)
         
         first_name = message.from_user.first_name if message.from_user.first_name else "друг"
         
-        # Получаем приветственное сообщение из настроек БД
-        try:
-            import sys
-            import os
-            
-            # Добавляем backend в path
-            backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
-            if backend_path not in sys.path:
-                sys.path.insert(0, backend_path)
-            
-            from config.database import get_db_session
-            from services.app_settings_service import AppSettingsService
-            
-            async with get_db_session() as session:
-                app_settings = await AppSettingsService.get_settings(session)
-                if app_settings.bot_welcome_message:
-                    # Используем настройку из БД, подставляя имя пользователя
-                    welcome_msg = app_settings.bot_welcome_message.format(first_name=first_name)
-                else:
-                    # Fallback к сообщению по умолчанию
-                    welcome_msg = (
-                        f"👋 *{first_name}, добро пожаловать!*\n\n"
-                        f"🔓 Получите свободный доступ к интернету\n"
-                        f"💳 Выберите подписку для получения VPN ключей\n"
-                        f"🔑 Управляйте своими ключами\n\n"
-                        f"Выберите действие в меню ниже:"
-                    )
-        except Exception as e:
-            logger.error("Error getting welcome message from DB", error=str(e))
-            # Fallback к сообщению по умолчанию
-            welcome_msg = (
-                f"👋 *{first_name}, добро пожаловать!*\n\n"
-                f"🔓 Получите свободный доступ к интернету\n"
-                f"💳 Выберите подписку для получения VPN ключей\n"
-                f"🔑 Управляйте своими ключами\n\n"
-                f"Выберите действие в меню ниже:"
-            )
+        # Простое приветственное сообщение без обращения к БД
+        welcome_msg = (
+            f"👋 *{first_name}, добро пожаловать!*\n\n"
+            f"🔓 Получите свободный доступ к интернету\n"
+            f"💳 Выберите подписку для получения VPN ключей\n"
+            f"🔑 Управляйте своими ключами\n\n"
+            f"Выберите действие в меню ниже:"
+        )
         
+        # Сначала отправляем ответ пользователю (быстро)
         await send_main_menu(message, telegram_id, welcome_msg)
         logger.info("Authorization successful", telegram_id=telegram_id, is_admin=is_admin)
+        
+        # Затем асинхронно проверяем админский статус из БД (медленно, но не блокирует)
+        asyncio.create_task(_check_admin_status_async(telegram_id, is_admin))
         
     except Exception as e:
         logger.error("Authorization error", error=str(e))
@@ -106,6 +86,36 @@ async def start_command(message: types.Message, state: FSMContext):
             await send_main_menu(message, message.from_user.id, "⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
         except:
             await message.answer("⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
+
+async def _check_admin_status_async(telegram_id: int, current_is_admin: bool):
+    """Асинхронная проверка админского статуса из БД (не блокирует основной поток)"""
+    try:
+        # Импортируем здесь, чтобы избежать циклических импортов
+        import sys
+        import os
+        
+        # Добавляем backend в path
+        backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
+        if backend_path not in sys.path:
+            sys.path.insert(0, backend_path)
+        
+        from config.database import get_db_session
+        from services.app_settings_service import AppSettingsService
+        
+        async with get_db_session() as session:
+            db_is_admin = await AppSettingsService.is_admin_telegram_id(session, telegram_id)
+            
+            if db_is_admin != current_is_admin:
+                logger.info("Admin status mismatch detected", 
+                           telegram_id=telegram_id, 
+                           env_is_admin=current_is_admin, 
+                           db_is_admin=db_is_admin)
+                
+    except Exception as e:
+        logger.error("Error in async admin status check", 
+                    telegram_id=telegram_id, 
+                    error=str(e))
+        # Не критично - пользователь уже получил ответ
 
 @start_router.message(F.text == "🔐 Получить VPN доступ")
 async def get_vpn_access_handler(message: types.Message):

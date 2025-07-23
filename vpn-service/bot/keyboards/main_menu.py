@@ -300,7 +300,7 @@ async def _make_api_request(endpoint: str) -> dict:
     try:
         async with aiohttp.ClientSession() as session:
             url = f"http://backend:8000{endpoint}"
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
@@ -331,8 +331,15 @@ async def get_user_subscription_days(telegram_id: int) -> int:
                 
                 if user_result and user_result.get('success'):
                     logger.info("✅ Новый пользователь создан", telegram_id=telegram_id)
-                    # Повторно запрашиваем данные пользователя
-                    user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
+                    
+                    # Используем данные из результата создания вместо повторного API запроса
+                    if user_result.get('source') == 'FULL_CYCLE_NEW_USER':
+                        # Новый пользователь создан - у него есть триал
+                        logger.info("✅ Новый пользователь с триалом", telegram_id=telegram_id)
+                        return 7  # 7 дней триала по умолчанию
+                    else:
+                        # Существующий пользователь - запрашиваем актуальные данные
+                        user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
                 else:
                     logger.error("❌ Не удалось создать пользователя", telegram_id=telegram_id, error=user_result.get('error', 'Unknown error'))
                     return 0
