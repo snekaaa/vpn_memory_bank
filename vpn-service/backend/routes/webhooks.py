@@ -483,6 +483,20 @@ async def _send_payment_notification(payment: Payment, subscription: Subscriptio
                     subscription_type=subscription.subscription_type.value,
                     vpn_key_name=vpn_key_name
                 )
+                
+                # НОВОЕ: Автоматически обновляем меню пользователя после успешной оплаты
+                try:
+                    from services.menu_updater_service import menu_updater_service
+                    await menu_updater_service.update_user_menu_after_payment(user.telegram_id)
+                    logger.info("✅ User menu updated after successful payment", 
+                               telegram_id=user.telegram_id,
+                               payment_id=payment.id)
+                except Exception as menu_error:
+                    logger.error("❌ Failed to update user menu after payment", 
+                               telegram_id=user.telegram_id,
+                               payment_id=payment.id,
+                               error=str(menu_error))
+                    # Не прерываем основной процесс из-за ошибки обновления меню
             else:
                 # Отправляем уведомление о неудачной оплате
                 failure_reason = None

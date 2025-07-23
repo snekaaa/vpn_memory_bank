@@ -198,6 +198,27 @@ class PaymentManagementService:
             # Сохраняем изменения в базе данных
             await self.db.commit()
             
+            # Обновляем меню пользователя в боте после изменения статуса платежа
+            if new_status == PaymentStatus.SUCCEEDED and extended_user is not None:
+                try:
+                    from services.menu_updater_service import MenuUpdaterService
+                    menu_updater = MenuUpdaterService()
+                    await menu_updater.update_user_menu_after_payment(extended_user.telegram_id)
+                    self.logger.info(
+                        "User menu updated after payment success",
+                        user_id=payment.user_id,
+                        telegram_id=extended_user.telegram_id,
+                        payment_id=payment_id
+                    )
+                except Exception as menu_error:
+                    self.logger.warning(
+                        "Failed to update user menu after payment success",
+                        user_id=payment.user_id,
+                        telegram_id=extended_user.telegram_id if extended_user else None,
+                        payment_id=payment_id,
+                        error=str(menu_error)
+                    )
+            
             self.logger.info(
                 "Payment status updated",
                 payment_id=payment_id,

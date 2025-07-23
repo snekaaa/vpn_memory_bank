@@ -174,12 +174,16 @@ async def get_user_dashboard_enhanced(telegram_id: int, db: AsyncSession = Depen
 async def full_cycle_endpoint(
     telegram_id: int = Body(...),
     user_data: Dict[str, Any] = Body(...),
-    subscription_type: str = Body("monthly")
+    subscription_type: Optional[str] = Body(None)
 ):
     """
     Полный цикл: создание пользователя -> подписка -> VPN ключ
     End-to-End интеграция всех компонентов
     """
+    
+    logger.info("Full cycle endpoint called", 
+               telegram_id=telegram_id,
+               subscription_type=subscription_type)
     
     results = {
         "telegram_id": telegram_id,
@@ -189,10 +193,11 @@ async def full_cycle_endpoint(
     }
     
     try:
-        # Шаг 1: Создание пользователя (с 7 днями триала)
+        # Шаг 1: Создание пользователя с указанным типом подписки
         user_result = await integration_service.create_user_with_subscription(
             telegram_id=telegram_id,
-            user_data=user_data
+            user_data=user_data,
+            subscription_type=subscription_type
         )
         
         results["steps"].append({
@@ -207,20 +212,28 @@ async def full_cycle_endpoint(
         
         user_id = user_result["user_id"]
         
-        # Шаг 2: Создание VPN ключа (упрощенная архитектура без подписок)
-        vpn_key_result = await integration_service.create_vpn_key_full_cycle(
-            user_id=user_id
-        )
-        
-        results["steps"].append({
-            "step": "vpn_key_creation",
-            "success": vpn_key_result["success"],
-            "message": vpn_key_result["message"]
-        })
-        
-        if not vpn_key_result["success"]:
-            results["success"] = False
-            return results
+        # Шаг 2: Создание VPN ключа (только если есть активная подписка)
+        vpn_key_result = None
+        if subscription_type is not None:
+            vpn_key_result = await integration_service.create_vpn_key_full_cycle(
+                user_id=user_id
+            )
+            
+            results["steps"].append({
+                "step": "vpn_key_creation",
+                "success": vpn_key_result["success"],
+                "message": vpn_key_result["message"]
+            })
+            
+            if not vpn_key_result["success"]:
+                results["success"] = False
+                return results
+        else:
+            results["steps"].append({
+                "step": "vpn_key_creation",
+                "success": True,
+                "message": "VPN ключ не создается - пользователь без подписки"
+            })
         
         # Шаг 3: Получение dashboard
         dashboard_result = await integration_service.get_user_dashboard(telegram_id)
@@ -234,11 +247,15 @@ async def full_cycle_endpoint(
         # Финальные данные (упрощенная архитектура)
         results["final_data"] = {
             "user": user_result["user"],
-            "vpn_key": vpn_key_result["vpn_key"],
+            "vpn_key": vpn_key_result["vpn_key"] if vpn_key_result else None,
             "dashboard": dashboard_result if dashboard_result["success"] else None
         }
         
-        results["message"] = "Пользователь создан с 7 днями триала и VPN ключом!"
+        # Формируем сообщение в зависимости от типа подписки
+        if subscription_type is None:
+            results["message"] = "Пользователь создан без подписки!"
+        else:
+            results["message"] = f"Пользователь создан с подпиской типа '{subscription_type}' и VPN ключом!"
         
         return results
         
@@ -326,8 +343,38 @@ async def update_vpn_key(
 
 @router.get("/test-endpoint")
 async def test_endpoint():
-    """Простой тестовый endpoint для диагностики"""
-    return {"message": "Test endpoint works!", "timestamp": time.time()}
+    """Тестовый endpoint для проверки работы интеграции"""
+    return {
+        "success": True,
+        "message": "Integration service is working",
+        "timestamp": time.time()
+    }
+
+@router.get("/app-settings")
+async def get_app_settings_endpoint(db: AsyncSession = Depends(get_db)):
+    """Получение настроек приложения"""
+    try:
+        from services.app_settings_service import AppSettingsService
+        
+        app_settings = await AppSettingsService.get_settings(db)
+        
+        return {
+            "success": True,
+            "settings": {
+                "trial_enabled": app_settings.trial_enabled,
+                "trial_days": app_settings.trial_days,
+                "trial_max_per_user": app_settings.trial_max_per_user,
+                "site_name": app_settings.site_name,
+                "site_domain": app_settings.site_domain
+            }
+        }
+    except Exception as e:
+        logger.error("Error getting app settings", error=str(e))
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Ошибка получения настроек приложения"
+        }
 
 @router.delete("/vpn-key/x3ui/{client_id}")
 async def delete_x3ui_key_direct(

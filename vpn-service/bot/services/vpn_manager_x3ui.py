@@ -304,6 +304,28 @@ class VPNManagerX3UI:
             logger.info("🆕 Creating new user via full-cycle", 
                        telegram_id=telegram_id)
             
+            # Получаем настройки триала из API
+            subscription_type = None  # По умолчанию без подписки
+            try:
+                settings_result = await self._make_request("GET", "/api/v1/integration/app-settings")
+                if settings_result and settings_result.get("success"):
+                    settings = settings_result.get("settings", {})
+                    trial_enabled = settings.get("trial_enabled", False)
+                    if trial_enabled:
+                        subscription_type = "trial"
+                        logger.info("✅ Trial enabled in settings, using trial subscription", 
+                                   telegram_id=telegram_id)
+                    else:
+                        logger.info("ℹ️ Trial disabled in settings, creating user without subscription", 
+                                   telegram_id=telegram_id)
+                else:
+                    logger.warning("⚠️ Could not get settings, creating user without subscription", 
+                                 telegram_id=telegram_id)
+            except Exception as settings_error:
+                logger.error("❌ Error getting settings, creating user without subscription", 
+                           telegram_id=telegram_id,
+                           error=str(settings_error))
+            
             user_data = {
                 "username": username,
                 "first_name": first_name or f"User_{telegram_id}",
@@ -316,7 +338,7 @@ class VPNManagerX3UI:
                 {
                     "telegram_id": telegram_id,
                     "user_data": user_data,
-                    "subscription_type": "trial"
+                    "subscription_type": subscription_type
                 }
             )
             

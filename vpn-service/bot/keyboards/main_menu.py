@@ -342,9 +342,37 @@ async def get_user_subscription_days(telegram_id: int, user_data: dict = None) -
                     
                     # Используем данные из результата создания вместо повторного API запроса
                     if user_result.get('source') == 'FULL_CYCLE_NEW_USER':
-                        # Новый пользователь создан - у него есть триал
-                        logger.info("✅ Новый пользователь с триалом", telegram_id=telegram_id)
-                        return 7  # 7 дней триала по умолчанию
+                        # Новый пользователь создан - проверяем настройки триала через API
+                        logger.info("✅ Новый пользователь создан, проверяем настройки триала", telegram_id=telegram_id)
+                        
+                        # Получаем настройки приложения через API
+                        try:
+                            settings_data = await _make_api_request("/api/v1/integration/app-settings")
+                            if settings_data and settings_data.get('success'):
+                                settings = settings_data.get('settings', {})
+                                trial_enabled = settings.get('trial_enabled', False)
+                                trial_days = settings.get('trial_days', 0)
+                                
+                                if trial_enabled and trial_days > 0:
+                                    logger.info("✅ Триал включен в настройках", 
+                                               telegram_id=telegram_id,
+                                               trial_days=trial_days)
+                                    return trial_days
+                                else:
+                                    logger.info("ℹ️ Триал выключен в настройках", 
+                                               telegram_id=telegram_id,
+                                               trial_enabled=trial_enabled,
+                                               trial_days=trial_days)
+                                    return 0
+                            else:
+                                logger.warning("⚠️ Не удалось получить настройки, используем 0 дней", 
+                                             telegram_id=telegram_id)
+                                return 0
+                        except Exception as settings_error:
+                            logger.error("❌ Ошибка получения настроек триала", 
+                                        telegram_id=telegram_id,
+                                        error=str(settings_error))
+                            return 0
                     else:
                         # Существующий пользователь - запрашиваем актуальные данные
                         user_data_to_use = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")

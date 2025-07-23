@@ -138,6 +138,25 @@ class PaymentSchedulerService:
                 f"📅 Следующее списание: {autopay.next_payment_date.strftime('%d.%m.%Y')}"
             )
         )
+        
+        # НОВОЕ: Автоматически обновляем меню пользователя после успешного автоплатежа
+        try:
+            from services.menu_updater_service import menu_updater_service
+            # Получаем telegram_id пользователя
+            user_query = select(User).where(User.id == autopay.user_id)
+            user_result = await self.db.execute(user_query)
+            user = user_result.scalar_one_or_none()
+            
+            if user and user.telegram_id:
+                await menu_updater_service.update_user_menu_after_payment(user.telegram_id)
+                logger.info("✅ User menu updated after successful autopayment", 
+                           telegram_id=user.telegram_id,
+                           autopay_id=autopay.id)
+        except Exception as menu_error:
+            logger.error("❌ Failed to update user menu after autopayment", 
+                       autopay_id=autopay.id,
+                       error=str(menu_error))
+            # Не прерываем основной процесс из-за ошибки обновления меню
     
     async def _handle_failed_autopayment(self, autopay: AutoPayment, error_result: Dict[str, Any]):
         """Обработка неудачного автоплатежа"""
