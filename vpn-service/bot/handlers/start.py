@@ -273,8 +273,7 @@ async def legal_documents_handler(message: types.Message):
         ])
         
         await message.answer(
-            "📄 *Оферта и Политика конфиденциальности*\n\n"
-            "Ознакомьтесь с нашими документами:",
+            "📄 *Оферта и Политика конфиденциальности*\n\n",
             reply_markup=legal_keyboard,
             parse_mode="Markdown"
         )
