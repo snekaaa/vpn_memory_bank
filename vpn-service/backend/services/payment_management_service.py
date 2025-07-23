@@ -94,7 +94,7 @@ class PaymentManagementService:
             )
             
             self.db.add(payment)
-            await self.db.flush()  # Получаем ID платежа
+            await self.db.commit()  # Сохраняем платеж в базе данных
             
             # Audit logging
             await self._log_payment_operation(
@@ -195,6 +195,9 @@ class PaymentManagementService:
                 }
             )
             
+            # Сохраняем изменения в базе данных
+            await self.db.commit()
+            
             self.logger.info(
                 "Payment status updated",
                 payment_id=payment_id,
@@ -287,6 +290,9 @@ class PaymentManagementService:
             
             # Продлеваем подписку
             user.extend_subscription(days_to_extend)
+            
+            # Сохраняем изменения в базе данных
+            await self.db.commit()
             
             self.logger.info(
                 "User subscription extended",

@@ -135,3 +135,18 @@ subscription_keyboard = await get_subscription_keyboard_with_autopay_toggle(auto
 
 ---
 *Implementation complete - ready for reflection*
+
+# VPN Service - Active Tasks
+
+## 📋 CURRENT STATUS: READY FOR NEW TASK
+
+**Last Updated**: 2025-07-23  
+**Memory Bank Status**: ✅ Previous task completed and archived  
+**System Status**: ✅ All systems operational  
+
+## 🎯 READY FOR NEXT TASK
+
+Система готова к выполнению новых задач. Последний баг с созданием платежей успешно исправлен.
+
+---
+*Ready for new task*
