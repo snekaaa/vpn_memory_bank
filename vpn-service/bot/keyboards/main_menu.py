@@ -506,6 +506,9 @@ def get_main_menu(days_remaining: int = 0, has_active_subscription: bool = True)
             [
                 KeyboardButton(text="📱 Приложения"),
                 KeyboardButton(text="🧑🏼‍💻 Служба поддержки")
+            ],
+            [
+                KeyboardButton(text="📄 Оферта и Политика конфиденциальности")
             ]
         ],
         resize_keyboard=True,

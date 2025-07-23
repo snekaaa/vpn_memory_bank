@@ -255,4 +255,29 @@ async def support_handler(message: types.Message):
         )
     except Exception as e:
         logger.error("Error handling support", error=str(e))
+        await message.answer("❌ Произошла ошибка")
+
+@start_router.message(F.text == "📄 Оферта и Политика конфиденциальности")
+async def legal_documents_handler(message: types.Message):
+    """Обработчик кнопки Оферта и Политика конфиденциальности"""
+    try:
+        legal_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(
+                text="📋 Оферта",
+                url="https://telegra.ph/Oferta-VPN-servisa-BezLagov-07-20"
+            )],
+            [types.InlineKeyboardButton(
+                text="🔒 Политика конфиденциальности",
+                url="https://telegra.ph/Politika-konfidencialnosti-07-20-41"
+            )]
+        ])
+        
+        await message.answer(
+            "📄 *Оферта и Политика конфиденциальности*\n\n"
+            "Ознакомьтесь с нашими документами:",
+            reply_markup=legal_keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error("Error handling legal documents", error=str(e))
         await message.answer("❌ Произошла ошибка") 
