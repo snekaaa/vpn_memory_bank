@@ -34,14 +34,12 @@ print("DEBUG: Logger configured")
 async def get_bot_token_from_db():
     """Получить токен бота из БД настроек"""
     try:
-        # Подключаемся к БД
-        conn = await asyncpg.connect(
-            host='db',
-            port=5432,
-            user='vpn_user',
-            password='vpn_password',
-            database='vpn_db'
-        )
+        # Используем DATABASE_URL из настроек
+        from config.settings import settings
+        database_url = settings.DATABASE_URL
+        
+        # Подключаемся к БД используя DATABASE_URL
+        conn = await asyncpg.connect(database_url)
         
         # Получаем токен из app_settings
         result = await conn.fetchval(
