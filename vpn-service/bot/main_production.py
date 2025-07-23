@@ -4,6 +4,7 @@
 
 import asyncio
 import structlog
+import asyncpg
 from aiogram import Bot, Dispatcher, Router
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
@@ -12,6 +13,50 @@ print("DEBUG: Starting imports...")
 
 from config.settings import get_settings
 print("DEBUG: Settings imported")
+
+async def get_bot_token_from_db():
+    """Получить токен бота из БД настроек"""
+    try:
+        # Используем DATABASE_URL из настроек
+        from config.settings import settings
+        database_url = settings.DATABASE_URL
+        print(f"DEBUG: Original DATABASE_URL: {database_url}")
+        
+        # Конвертируем URL для asyncpg
+        if database_url.startswith('postgresql://'):
+            database_url = database_url.replace('postgresql://', 'postgresql+asyncpg://')
+        print(f"DEBUG: Converted DATABASE_URL: {database_url}")
+        
+        # Подключаемся к БД используя DATABASE_URL
+        print("DEBUG: Attempting to connect to database...")
+        conn = await asyncpg.connect(database_url)
+        print("DEBUG: Successfully connected to database")
+        
+        # Получаем токен из app_settings
+        print("DEBUG: Fetching token from database...")
+        result = await conn.fetchval(
+            "SELECT telegram_bot_token FROM app_settings WHERE id = 1"
+        )
+        print(f"DEBUG: Token from DB: {result}")
+        
+        await conn.close()
+        print("DEBUG: Database connection closed")
+        
+        if result:
+            print(f"DEBUG: Using token from DB: {result}")
+            return result
+        else:
+            # Fallback к значению по умолчанию
+            print("DEBUG: No token in DB, using fallback")
+            return "8134936400:AAHG1_hQCcY_RyqNKcTC-bQen0_JTgTjGLQ"
+            
+    except Exception as e:
+        print(f"Error getting bot token from DB: {e}")
+        print(f"DEBUG: Exception type: {type(e)}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        # Fallback к значению по умолчанию
+        return "8134936400:AAHG1_hQCcY_RyqNKcTC-bQen0_JTgTjGLQ"
 
 logger = structlog.get_logger(__name__)
 print("DEBUG: Logger configured")
@@ -69,13 +114,17 @@ async def main():
     settings = get_settings()
     print("DEBUG: Settings obtained")
     
+    # Получаем токен из БД
+    bot_token = await get_bot_token_from_db()
+    print(f"DEBUG: Bot token obtained: {bot_token[:10]}...")
+    
     # Проверяем конфигурацию
     logger.info("Bot configuration validated", 
-               TELEGRAM_TOKEN="***" if settings.TELEGRAM_TOKEN else "MISSING")
+               TELEGRAM_TOKEN="***" if bot_token else "MISSING")
     print("DEBUG: Configuration validated")
     
     # Инициализируем бота и диспетчер с хранилищем состояний
-    bot = Bot(token=settings.TELEGRAM_TOKEN)
+    bot = Bot(token=bot_token)
     print("DEBUG: Bot created")
     
     dp = Dispatcher(storage=MemoryStorage())

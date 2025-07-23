@@ -34,4 +34,4 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Команда запуска
-CMD ["python", "main.py"] 
+CMD ["python", "main_production.py"] 
