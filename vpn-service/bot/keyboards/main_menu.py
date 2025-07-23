@@ -311,23 +311,31 @@ async def _make_api_request(endpoint: str) -> dict:
         return {}
 
 
-async def get_user_subscription_days(telegram_id: int) -> int:
+async def get_user_subscription_days(telegram_id: int, user_data: dict = None) -> int:
     """Получить количество дней до окончания подписки пользователя"""
     try:
         logger.info("🔍 Получаем данные пользователя для подсчета дней подписки", telegram_id=telegram_id)
         
         # Получаем данные пользователя из API через прямой HTTP запрос
-        user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
+        user_data_to_use = user_data if user_data else await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
         
-        if not user_data or not user_data.get('success'):
+        if not user_data_to_use or not user_data_to_use.get('success'):
             logger.warning("❌ Пользователь не найден в API, создаем нового", telegram_id=telegram_id)
             
             # Создаем нового пользователя через full-cycle API
             try:
                 from services.vpn_manager_x3ui import vpn_manager_x3ui as vpn_manager
                 
-                # Создаем пользователя через VPN manager
-                user_result = await vpn_manager.get_or_create_user_key(telegram_id, "", "")
+                # Используем переданные данные пользователя или пустые строки
+                if user_data:
+                    username = user_data.get("username", "")
+                    first_name = user_data.get("first_name", "")
+                else:
+                    username = ""
+                    first_name = ""
+                
+                # Создаем пользователя через VPN manager с правильными данными
+                user_result = await vpn_manager.get_or_create_user_key(telegram_id, username, first_name)
                 
                 if user_result and user_result.get('success'):
                     logger.info("✅ Новый пользователь создан", telegram_id=telegram_id)
@@ -339,7 +347,7 @@ async def get_user_subscription_days(telegram_id: int) -> int:
                         return 7  # 7 дней триала по умолчанию
                     else:
                         # Существующий пользователь - запрашиваем актуальные данные
-                        user_data = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
+                        user_data_to_use = await _make_api_request(f"/api/v1/integration/user-dashboard/{telegram_id}")
                 else:
                     logger.error("❌ Не удалось создать пользователя", telegram_id=telegram_id, error=user_result.get('error', 'Unknown error'))
                     return 0
@@ -348,11 +356,11 @@ async def get_user_subscription_days(telegram_id: int) -> int:
                 logger.error("❌ Ошибка создания пользователя", telegram_id=telegram_id, error=str(create_error))
                 return 0
         
-        if not user_data or not user_data.get('success'):
+        if not user_data_to_use or not user_data_to_use.get('success'):
             logger.warning("❌ Пользователь не найден в API", telegram_id=telegram_id)
             return 0
         
-        user_info = user_data.get('user', {})
+        user_info = user_data_to_use.get('user', {})
         
         logger.info("✅ Данные пользователя получены", 
                    telegram_id=telegram_id,
@@ -426,17 +434,22 @@ async def get_user_subscription_days(telegram_id: int) -> int:
                     error=str(e))
         return 0
 
-async def send_main_menu(message, telegram_id, text="🏠 Главное меню"):
-    """Универсальный хелпер для отправки главного меню с актуальным количеством дней подписки"""
-    days_remaining = await get_user_subscription_days(telegram_id)
-    
-    # Определяем есть ли активная подписка
-    has_active_subscription = days_remaining > 0
-    
-    await message.answer(
-        text,
-        reply_markup=get_main_menu(days_remaining, has_active_subscription)
-    )
+async def send_main_menu(message, telegram_id, text="🏠 Главное меню", user_data=None):
+    """Отправить главное меню пользователю"""
+    try:
+        # Получаем количество дней подписки с передачей данных пользователя
+        days_remaining = await get_user_subscription_days(telegram_id, user_data)
+        
+        # Создаем клавиатуру главного меню
+        keyboard = get_main_menu(days_remaining, days_remaining > 0)
+        
+        # Отправляем сообщение с клавиатурой
+        await message.answer(text, reply_markup=keyboard, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error("Error sending main menu", telegram_id=telegram_id, error=str(e))
+        # Fallback - отправляем без клавиатуры
+        await message.answer(text, parse_mode='Markdown')
 
 def get_main_menu(days_remaining: int = 0, has_active_subscription: bool = True) -> ReplyKeyboardMarkup:
     """Главное меню с кнопками для быстрого доступа"""

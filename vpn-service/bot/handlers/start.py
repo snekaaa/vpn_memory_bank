@@ -74,7 +74,7 @@ async def start_command(message: types.Message, state: FSMContext):
         )
         
         # Сначала отправляем ответ пользователю (быстро)
-        await send_main_menu(message, telegram_id, welcome_msg)
+        await send_main_menu(message, telegram_id, welcome_msg, user_data)
         logger.info("Authorization successful", telegram_id=telegram_id, is_admin=is_admin)
         
         # Затем асинхронно проверяем админский статус из БД (медленно, но не блокирует)
@@ -83,7 +83,7 @@ async def start_command(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error("Authorization error", error=str(e))
         try:
-            await send_main_menu(message, message.from_user.id, "⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
+            await send_main_menu(message, message.from_user.id, "⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start", user_data)
         except:
             await message.answer("⚠️ Произошла ошибка при запуске\nПопробуйте еще раз /start")
 
