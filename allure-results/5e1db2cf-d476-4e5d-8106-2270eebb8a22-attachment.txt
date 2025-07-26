@@ -1,0 +1,3 @@
+Trial: {'success': True, 'user_created': True, 'subscription': {'is_trial': True, 'days': 3}, 'vpn_key': {'status': 'active'}}
+Paid: {'success': True, 'user_created': True, 'subscription': {'is_trial': False, 'days': 30}, 'vpn_key': {'status': 'active'}}
+Error: {'success': False, 'error': 'Invalid telegram_id or plan_id', 'user_created': False}

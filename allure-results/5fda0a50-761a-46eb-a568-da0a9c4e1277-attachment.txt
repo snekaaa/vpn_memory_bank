@@ -1,0 +1,2 @@
+Active: {'user': {'telegram_id': 111111, 'subscription_active': True, 'subscription_days_left': 15}, 'vpn_keys': [{'key_id': 'active-key', 'status': 'active'}], 'subscription': {'auto_renewal': True}}
+Expired: {'user': {'telegram_id': 222222, 'subscription_active': False, 'subscription_days_left': 0}, 'vpn_keys': [], 'subscription': {'auto_renewal': False}}

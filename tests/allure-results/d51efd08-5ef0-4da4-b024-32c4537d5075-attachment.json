@@ -1,0 +1,9 @@
+{
+  "id": 12345,
+  "status": "paid",
+  "price_amount": "500.00",
+  "price_currency": "RUB",
+  "receive_amount": "0.000123",
+  "receive_currency": "BTC",
+  "order_id": "order_12345"
+}

@@ -1,0 +1,1 @@
+{'user': {'telegram_id': 123456789, 'username': 'test_user', 'subscription_active': True, 'subscription_days_left': 25}, 'vpn_keys': [{'key_id': 'test-key-1', 'country': 'US', 'status': 'active', 'expires_at': '2025-02-20T12:00:00Z'}], 'subscription': {'plan_name': 'Monthly', 'auto_renewal': True, 'next_payment_date': '2025-02-20'}}

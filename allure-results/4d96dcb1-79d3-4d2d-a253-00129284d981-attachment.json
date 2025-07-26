@@ -1,0 +1,17 @@
+{
+  "type": "notification",
+  "event": "payment.succeeded",
+  "object": {
+    "id": "25b94794-000f-5000-9000-145f6df21d6f",
+    "status": "succeeded",
+    "amount": {
+      "value": "500.00",
+      "currency": "RUB"
+    },
+    "description": "VPN подписка",
+    "metadata": {
+      "order_id": "12345",
+      "user_id": "123456789"
+    }
+  }
+}

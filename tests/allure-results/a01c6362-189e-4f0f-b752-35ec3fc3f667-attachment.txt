@@ -1,0 +1,1 @@
+Validation passed for input: {'telegram_id': 123456789, 'username': 'valid_user', 'first_name': 'John', 'plan_id': 1}

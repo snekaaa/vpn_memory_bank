@@ -1,0 +1,1 @@
+{'status': 'success', 'payment_id': 12345, 'payment_url': 'https://robokassa.ru/Merchant/Index.aspx?MerchantLogin=vpn-bezlagov&OutSum=500.00...', 'amount': 500.0, 'currency': 'RUB'}

@@ -1,0 +1,2 @@
+Trial scenario: {'trial_enabled': True, 'trial_days': 7, 'auto_renewal_enabled': False}
+No trial scenario: {'trial_enabled': False, 'trial_days': 0, 'auto_renewal_enabled': True}
