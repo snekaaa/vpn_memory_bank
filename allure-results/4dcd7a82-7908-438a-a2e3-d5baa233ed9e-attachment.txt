@@ -1,2 +1,0 @@
-Monthly: {'status': 'success', 'payment_id': 101, 'payment_url': 'https://robokassa.ru/monthly_payment', 'amount': 500.0, 'currency': 'RUB'}
-Quarterly: {'status': 'success', 'payment_id': 102, 'payment_url': 'https://robokassa.ru/quarterly_payment', 'amount': 1200.0, 'currency': 'RUB'}

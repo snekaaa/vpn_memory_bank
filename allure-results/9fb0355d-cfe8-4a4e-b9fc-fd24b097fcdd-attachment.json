@@ -1,8 +1,0 @@
-{
-  "MERCHANT_ID": "12345",
-  "AMOUNT": "500.00",
-  "intid": "98765",
-  "MERCHANT_ORDER_ID": "order_12345",
-  "SIGN": "calculated_signature_hash",
-  "us_user_id": "123456789"
-}

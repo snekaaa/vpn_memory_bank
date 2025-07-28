@@ -1,1 +1,0 @@
-Validation passed for request: {'user_id': 123456789, 'subscription_type': 'monthly', 'service_name': 'VPN Premium', 'user_email': 'valid@example.com', 'provider_type': 'robokassa', 'enable_autopay': False}
