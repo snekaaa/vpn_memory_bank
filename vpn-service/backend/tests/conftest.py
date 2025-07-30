@@ -1,7 +1,36 @@
 import pytest
+import httpx
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any, List, AsyncGenerator
 from datetime import datetime, timedelta
+
+# Real API client fixtures for HTTP requests
+@pytest.fixture
+async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
+    """Фикстура для асинхронного HTTP клиента"""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        yield client
+
+@pytest.fixture
+def base_url() -> str:
+    """Базовый URL для API тестов"""
+    return "http://localhost:8000"
+
+@pytest.fixture
+def test_telegram_id() -> int:
+    """Тестовый Telegram ID"""
+    return 123456789
+
+@pytest.fixture
+def test_user_data() -> Dict[str, Any]:
+    """Тестовые данные пользователя для реальных API вызовов"""
+    return {
+        "telegram_id": 123456789,
+        "username": "test_user",
+        "first_name": "Test",
+        "last_name": "User",
+        "language_code": "ru"
+    }
 
 
 @pytest.fixture
