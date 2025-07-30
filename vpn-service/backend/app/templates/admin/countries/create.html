@@ -3,36 +3,35 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="bi bi-plus-circle"></i> Добавить страну</h1>
-                <div class="btn-toolbar mb-2 mb-md-0">
-                    <div class="btn-group me-2">
-                        <a href="/admin/countries" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> Назад к списку
-                        </a>
-                    </div>
-                </div>
-            </div>
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Добавить страну</h2>
+        <p class="text-muted mb-0">Создание новой локации VPN сервера</p>
+    </div>
+    <div>
+        <a href="/admin/countries" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Назад к списку
+        </a>
+    </div>
+</div>
 
-            {% if error %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            {% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
 
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-globe"></i> Информация о стране
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <form action="/admin/countries/create" method="post">
-                        <div class="row">
+<div class="card admin-card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-globe"></i> Информация о стране
+        </h5>
+    </div>
+    <div class="card-body">
+        <form action="/admin/countries/create" method="post">
+            <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="code" class="form-label">Код страны *</label>
@@ -106,10 +105,6 @@
                         </div>
                     </form>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
 // Превью в реальном времени

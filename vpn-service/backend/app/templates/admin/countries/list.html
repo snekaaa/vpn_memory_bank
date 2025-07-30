@@ -3,24 +3,24 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="bi bi-globe"></i> Управление странами VPN серверов
-                    </h5>
-                    <div>
-                        <a href="/admin/countries/create" class="btn btn-sm btn-success me-2">
-                            <i class="bi bi-plus-circle"></i> Добавить страну
-                        </a>
-                        <button class="btn btn-sm btn-outline-primary" onclick="refreshStats()">
-                            <i class="bi bi-arrow-clockwise"></i> Обновить
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body">
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Управление странами VPN серверов</h2>
+        <p class="text-muted mb-0">Управление локациями VPN серверов</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/countries/create" class="btn btn-success">
+            <i class="bi bi-plus-circle me-1"></i>Добавить страну
+        </a>
+        <button class="btn btn-outline-primary" onclick="refreshStats()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+        </button>
+    </div>
+</div>
+
+<div class="card admin-card">
+    <div class="card-body">
                     {% if countries_stats %}
                     <div class="table-responsive">
                         <table class="table table-hover">
@@ -155,8 +155,8 @@
                         <p class="text-muted">Пока нет стран в системе</p>
                     </div>
                     {% endif %}
-                </div>
-            </div>
+    </div>
+</div>
             
             <!-- Additional Actions -->
             <div class="card mt-4">
@@ -192,9 +192,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
 <script>
 function refreshStats() {

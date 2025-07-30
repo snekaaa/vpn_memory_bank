@@ -3218,8 +3218,7 @@ async def admin_country_switch_logs(
             {
                 "request": request,
                 "logs_with_details": logs_with_details,
-                "title": "Логи переключения серверов",
-                "current_admin": current_admin
+                "title": "Логи переключения серверов"
             }
         )
         
