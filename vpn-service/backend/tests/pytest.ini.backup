@@ -1,0 +1,41 @@
+[pytest]
+minversion = 6.0
+addopts = -ra -q --strict-markers --tb=short --alluredir=allure-results
+testpaths = .
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+
+markers =
+    critical: marks tests as critical (deselect with '-m "not critical"')
+    integration: marks tests as integration tests
+    e2e: marks tests as end-to-end tests
+    unit: marks tests as unit tests
+    slow: marks tests as slow running
+    api: marks tests as API tests
+    webhook: marks tests as webhook tests
+    payment: marks tests as payment related tests
+    dashboard: marks tests as dashboard related tests
+    mock: marks tests using mock data
+    
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+    ignore::pytest.PytestUnraisableExceptionWarning
+
+log_cli = true
+log_cli_level = INFO
+log_cli_format = %(asctime)s [%(levelname)8s] %(name)s: %(message)s
+log_cli_date_format = %Y-%m-%d %H:%M:%S
+
+asyncio_mode = auto
+
+# Coverage thresholds
+[coverage:run]
+source = .
+branch = True
+
+[coverage:report]
+fail_under = 80
+show_missing = True
+skip_covered = False
