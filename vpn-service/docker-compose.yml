@@ -11,6 +11,8 @@ services:
       - bot_data:/app/data
     command: >
       bash -c "pip install -r requirements.txt &&
+               echo 'Waiting for database...' &&
+               python -c 'import time; time.sleep(10)' &&
                python main.py"
     environment:
       - PYTHONUNBUFFERED=1
@@ -19,7 +21,8 @@ services:
       - USE_SIMPLE_STORAGE=true
       - BACKEND_URL=http://backend:8000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   backend:
     build:
@@ -48,7 +51,8 @@ services:
       - ROBOKASSA_TEST_MODE=true
       - ROBOKASSA_HASH_TYPE=MD5
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

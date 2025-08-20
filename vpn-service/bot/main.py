@@ -31,33 +31,47 @@ print("DEBUG: Payments handler imported")
 logger = structlog.get_logger(__name__)
 print("DEBUG: Logger configured")
 
-async def get_bot_token_from_db():
-    """Получить токен бота из БД настроек"""
-    try:
-        # Используем DATABASE_URL из настроек
-        from config.settings import settings
-        database_url = settings.DATABASE_URL
-        
-        # Подключаемся к БД используя DATABASE_URL
-        conn = await asyncpg.connect(database_url)
-        
-        # Получаем токен из app_settings
-        result = await conn.fetchval(
-            "SELECT telegram_bot_token FROM app_settings WHERE id = 1"
-        )
-        
-        await conn.close()
-        
-        if result:
-            return result
-        else:
-            # Fallback к значению по умолчанию
-            return "8019787780:AAGy5cBWpQ09yvtDE3sp0AMY7kZyRYbSJqU"
+async def get_bot_token_from_db(max_retries=10, retry_delay=3):
+    """Получить токен бота из БД настроек с retry логикой"""
+    from config.settings import settings
+    
+    print("DEBUG: Starting database connection attempts...")
+    
+    for attempt in range(max_retries):
+        try:
+            database_url = settings.DATABASE_URL
             
-    except Exception as e:
-        print(f"Error getting bot token from DB: {e}")
-        # Fallback к значению по умолчанию
-        return "8019787780:AAGy5cBWpQ09yvtDE3sp0AMY7kZyRYbSJqU"
+            # Конвертируем URL для asyncpg (убираем +asyncpg если есть)
+            if '+asyncpg' in database_url:
+                database_url = database_url.replace('postgresql+asyncpg://', 'postgresql://')
+            
+            print(f"DEBUG: Attempt {attempt + 1}/{max_retries} to connect to DB")
+            
+            # Подключаемся к БД используя DATABASE_URL
+            conn = await asyncpg.connect(database_url)
+            
+            # Получаем токен из app_settings
+            result = await conn.fetchval(
+                "SELECT telegram_bot_token FROM app_settings WHERE id = 1"
+            )
+            
+            await conn.close()
+            
+            if result:
+                print(f"DEBUG: Successfully got token from DB: {result[:20]}...")
+                return result
+            else:
+                print("ERROR: No token found in DB!")
+                raise ValueError("Bot token not found in database")
+                
+        except Exception as e:
+            print(f"DEBUG: Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"DEBUG: Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                print("ERROR: All attempts to connect to DB failed!")
+                raise ValueError("Could not connect to database to get bot token")
 
 async def on_startup(bot: Bot):
     """
