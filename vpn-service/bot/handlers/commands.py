@@ -52,8 +52,8 @@ async def cmd_create_key(message: types.Message):
             except Exception as e:
                 # Fallback к базовому шаблону с сервером
                 from templates.messages import get_vpn_key_message_with_server
-                from handlers.vpn_simplified import DEMO_COUNTRIES
-                default_country = DEMO_COUNTRIES[0]  # Нидерланды
+                from handlers.vpn_simplified import get_default_country
+                default_country = await get_default_country()  # Первая доступная страна
                 message_text = get_vpn_key_message_with_server(
                     vpn_key_data['vless_url'], 
                     default_country, 
@@ -125,8 +125,8 @@ async def cmd_refresh_key(message: types.Message):
             except Exception as e:
                 # Fallback к базовому шаблону с сервером
                 from templates.messages import get_vpn_key_message_with_server
-                from handlers.vpn_simplified import DEMO_COUNTRIES
-                default_country = DEMO_COUNTRIES[0]  # Нидерланды
+                from handlers.vpn_simplified import get_default_country
+                default_country = await get_default_country()  # Первая доступная страна
                 message_text = get_vpn_key_message_with_server(
                     vless_url, 
                     default_country, 

@@ -37,11 +37,16 @@ COUNTRY_SERVICE_AVAILABLE = True
 logger = structlog.get_logger(__name__)
 logger.info("Country Service enabled with hardcoded demo data")
 
-# Хардкодные страны для демо - только активные
+# Хардкодные страны для демо - только как fallback на случай ошибки API
 DEMO_COUNTRIES = [
     {"id": 2, "code": "NL", "name": "Нидерланды", "flag_emoji": "🇳🇱", "display_name": "🇳🇱 Нидерланды"},
     {"id": 3, "code": "DE", "name": "Германия", "flag_emoji": "🇩🇪", "display_name": "🇩🇪 Германия"}
 ]
+
+async def get_default_country():
+    """Получить первую доступную страну как default"""
+    countries = await get_available_countries()
+    return countries[0] if countries else DEMO_COUNTRIES[0]
 
 async def get_user_current_assignment_info(telegram_id: int):
     """Получить информацию о текущем назначении пользователя"""
@@ -67,16 +72,40 @@ async def get_user_current_assignment_info(telegram_id: int):
         return None
 
 async def get_available_countries():
-    """Получить доступные страны - демо версия"""
-    return DEMO_COUNTRIES
+    """Получить доступные страны из API"""
+    try:
+        import aiohttp
+        
+        logger.info("Getting available countries from API")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "http://backend:8000/api/v1/countries/available"
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    logger.info("Available countries received from API", count=len(data))
+                    return data
+                else:
+                    logger.warning("Countries API returned error", status=response.status)
+                    # Fallback к демо данным только в случае ошибки API
+                    logger.warning("Falling back to demo countries")
+                    return DEMO_COUNTRIES
+                    
+    except Exception as e:
+        logger.error("Failed to get available countries from API", error=str(e))
+        # Fallback к демо данным только в случае ошибки
+        logger.warning("Falling back to demo countries due to error")
+        return DEMO_COUNTRIES
 
 async def get_user_dashboard_enhanced(telegram_id: int):
     """Получить расширенную информацию о пользователе - демо версия"""
+    countries = await get_available_countries()
     return {
         "success": True,
         "countries": {
-            "available": DEMO_COUNTRIES,
-            "current": {"country": DEMO_COUNTRIES[0]}  # По умолчанию Нидерланды
+            "available": countries,
+            "current": {"country": countries[0] if countries else DEMO_COUNTRIES[0]}
         }
     }
 
@@ -624,8 +653,8 @@ async def enhance_vpn_key_message(vless_url: str, telegram_id: int, is_update: b
             # У пользователя есть назначение - используем его
             current_country = assignment_info['country']
         else:
-            # Нет назначения - используем Нидерланды по умолчанию
-            current_country = DEMO_COUNTRIES[0]  # Нидерланды
+            # Нет назначения - используем первую доступную страну по умолчанию
+            current_country = countries_data[0] if countries_data else DEMO_COUNTRIES[0]
         
         # Показываем расширенный интерфейс с информацией о сервере
         message_text = get_vpn_key_message_with_server(
